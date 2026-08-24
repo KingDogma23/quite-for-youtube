@@ -37,16 +37,19 @@
     // ON by default. It is the better mechanism when it works: no ad is ever
     // queued, so nothing has to be skipped, sped up or seeked past.
     //
-    // It demonstrably WORKS: verified stripping adPlacements and playerAds from
-    // real responses, with zero ads reaching playback afterwards.
+    // It demonstrably WORKS: verified stripping the ad schedule from real
+    // responses, with zero ads reaching playback afterwards.
     //
-    // Whether YouTube detects it is genuinely unresolved. An anti-adblock wall
-    // appeared during testing, but another ad blocker doing network-level
-    // blocking was installed at the time, and YouTube's flag persists across
-    // reloads — so the evidence never cleanly separated the two. It has since
-    // run with no wall at all. Switching it off is the first thing to try for
-    // someone who hits the wall; the popup explains how to turn it off.
-    stripAdSchedule: true,
+    // OFF by default, because YouTube detects it. The anti-adblock wall that
+    // blocks playback entirely was reproduced with this as the only ad blocker
+    // running — an earlier sighting was ambiguous because a second, network
+    // -level blocker was installed at the time, but that one was disabled for
+    // this one, and the wall still appeared.
+    //
+    // A default that can stop video playing outright is a worse default than
+    // one that lets an ad start and then skips it, however much less effective
+    // it is. Available to anyone who wants to take the risk knowingly.
+    stripAdSchedule: false,
     badge: false,
   };
 
@@ -507,7 +510,22 @@
 
   loadLifetime();
 
-  chrome.storage.sync.get(DEFAULTS, (stored) => {
+  // One-time correction for installs that already have ad-schedule stripping
+  // switched on. Changing the default only affects NEW installs, and leaving
+  // an existing install in a state that YouTube blocks playback for is not
+  // acceptable — so it is turned off once, and once only. Anyone who wants it
+  // back can re-tick it and it will stay ticked.
+  const STRIP_OFF_ONCE = "stripDefaultedOffV1";
+
+  chrome.storage.sync.get({ ...DEFAULTS, [STRIP_OFF_ONCE]: false }, (stored) => {
+    if (!stored[STRIP_OFF_ONCE]) {
+      const wasOn = stored.stripAdSchedule;
+      stored.stripAdSchedule = false;
+      chrome.storage.sync.set({
+        [STRIP_OFF_ONCE]: true,
+        ...(wasOn ? { stripAdSchedule: false } : {}),
+      });
+    }
     settings = { ...DEFAULTS, ...stored };
     applyCssToggles();
     if (document.body) start();

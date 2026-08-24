@@ -9,8 +9,8 @@ A Chrome extension that removes ads from YouTube.
 | **Player overlays** | Banners drawn on top of the video |
 | **Merch shelves** | Product shelves under videos (optional, off by default) |
 
-No network-level blocking and no filter lists. Everything returns the moment
-you switch it off.
+No network-level blocking and no filter lists by default. Everything returns
+the moment you switch it off.
 
 ## Install
 
@@ -33,7 +33,7 @@ Click the extension icon. Changes apply immediately.
 | --- | --- | --- |
 | Extension on | on | Master switch |
 | Skip video ads | on | Clicks Skip, seeks past unskippable ads |
-| Strip ad schedule | on | Stops ads being queued for the player at all |
+| Stop ads loading | off | Stops ads being queued for the player at all. YouTube detects this and blocks playback — see below |
 | Hide feed & search ads | on | Homepage, sidebar, search, masthead |
 | Hide player overlays | on | Banners on top of the video |
 | Hide merch shelves | off | Product shelves under videos |
@@ -52,15 +52,16 @@ that never touches anything longer than three minutes, because that is not an
 ad. You briefly see an ad begin. Verified on live ads — 37 in one session, 35
 skipped, 2 fast-forwarded, 2 seeked, zero false seeks.
 
-**Strip ad schedule** (on by default) stops ads being queued for the player in
-the first place, so most never reach playback at all. Verified against real
-sessions with zero ads reaching the player. Whether YouTube reliably detects it
-is unresolved: an
-anti-adblock wall appeared during testing, but a second, network-blocking ad
-blocker was installed at the time and YouTube's flag persists across reloads,
-so the two were never cleanly separated. It has since run without a wall. If you ever see
-one, turn this off first — it is the most likely cause, and the skip/fast-forward
-path below keeps working without it.
+**Stop ads loading** is **off by default, and should probably stay off.** It
+stops ads being queued for the player at all, so most never reach playback —
+but YouTube detects it and responds with a wall that blocks video playback
+entirely until you disable the extension. That was reproduced with this as the
+only ad blocker running. A setting that can stop video playing is a worse
+default than one that lets an ad start and skips it, so it is opt-in for anyone
+who wants to take that risk knowingly.
+
+If you turn it on and hit the wall: untick it and reload the tab, twice if
+necessary — YouTube's flag persists for a reload or two.
 
 **Running two ad blockers is worse than running one.** Any network-level
 blocker will trigger the same wall, and with both installed you cannot tell
