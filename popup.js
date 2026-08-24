@@ -65,8 +65,12 @@ function render(d) {
     `last action: ${s.lastAction}`,
     `page: player=${d.page.playerFound} adNow=${d.page.adPlayingNow} ` +
       `skipBtn=${d.page.skipButtonVisible}`,
-    `feed ads: ${d.page.feedAds?.inDom ?? "?"} in DOM, ` +
-      `${d.page.feedAds?.stillVisible ?? "?"} STILL VISIBLE   (visible should be 0)`,
+    d.page.feedAds
+      ? `feed ads: ${d.page.feedAds.inDom} in DOM, ` +
+        `${d.page.feedAds.stillVisible} STILL VISIBLE   (visible should be 0)`
+      : `feed ads: unavailable — the page is running an OLDER content script ` +
+        `than this popup. Reload the extension on chrome://extensions, then ` +
+        `reload YouTube.`,
     `ad sightings captured: ${d.session.adSightings?.length ?? 0}`,
     d.session.firstAdSeen
       ? `first ad seen:\n` +
@@ -74,7 +78,9 @@ function render(d) {
         `  ad classes: ${d.session.firstAdSeen.adClassesFound.join(" ") || "(none)"}\n` +
         `  markers matched: ${d.session.firstAdSeen.markerMatched.join(" ") || "(NONE - names wrong)"}\n` +
         `  skip matched: ${d.session.firstAdSeen.skipMatched.join(" ") || "(none)"}\n` +
-        `  ad duration: ${d.session.firstAdSeen.videoDuration}s  adStateClass: ${d.session.firstAdSeen.adStateClass}`
+        `  ad duration: ${d.session.firstAdSeen.videoDuration}` +
+        `${typeof d.session.firstAdSeen.videoDuration === 'number' ? 's' : ''}` +
+        `  adStateClass: ${d.session.firstAdSeen.adStateClass}`
       : `first ad seen: none yet (watch a video with an ad)`,
   ].join("\n");
 

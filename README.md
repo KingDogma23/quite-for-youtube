@@ -44,20 +44,22 @@ Click the extension icon. Changes apply immediately.
 **Feed ads never paint at all.** They're hidden by a stylesheet that loads
 before the page renders, so there's no flicker and no scanning.
 
-**Why video ads are skipped, not removed.** It is possible to remove ads
-entirely by stripping the ad schedule out of the player's response before the
-page reads it — and this extension can do it, off by default under
-**Strip ad schedule**. It works. But YouTube checks whether the schedule it
-sent came back intact and, when it has not, blocks playback with the
-"Ad blockers violate YouTube's Terms of Service" wall. That was confirmed by
-testing on a live account: wall with it on, no wall with it off, nothing else
-changed.
+**Two ways to deal with video ads, and one is opt-in.**
 
-So the default is the quieter approach — let the ad play and get past it. Skip
-is clicked the moment it appears, unskippable ads are fast-forwarded, and
-seeking is a last resort that never touches anything longer than three minutes,
-because that is not an ad. You will briefly see an ad start. That is the
-trade-off for playback that keeps working.
+The default is to let the ad start and get past it: Skip is clicked the moment
+it appears, unskippable ads are fast-forwarded, and seeking is a last resort
+that never touches anything longer than three minutes, because that is not an
+ad. You briefly see an ad begin. Verified on live ads — 37 in one session, 35
+skipped, 2 fast-forwarded, 2 seeked, zero false seeks.
+
+**Strip ad schedule** (off by default) removes the ad schedule from the
+player's response before the page reads it, so no ad is ever queued. It works —
+verified removing `adPlacements` and `playerAds` from real responses with zero
+ads reaching playback. Whether YouTube reliably detects it is unresolved: an
+anti-adblock wall appeared during testing, but a second, network-blocking ad
+blocker was installed at the time and YouTube's flag persists across reloads,
+so the two were never cleanly separated. It has since run without a wall. Off
+by default is the cautious choice; turn it on and see.
 
 **Running two ad blockers is worse than running one.** Any network-level
 blocker will trigger the same wall, and with both installed you cannot tell

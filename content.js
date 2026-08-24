@@ -34,17 +34,17 @@
     hideMerch: false,
     // The page-world ad-schedule stripper.
     //
-    // OFF by default, and this was settled by testing rather than theory. The
-    // design assumption was that letting ad requests succeed and removing the
-    // schedule from the response would stay quieter than network blocking.
-    // It does not: YouTube checks whether the ad schedule it sent came back
-    // intact, and serves the "Ad blockers violate our Terms of Service" wall
-    // when it has not. Confirmed on a live account — wall with this on, no
-    // wall with it off, everything else identical.
+    // OFF by default — conservatively, not conclusively.
     //
-    // It is kept because it works (verified stripping adPlacements/playerAds
-    // from real responses) and because YouTube's detection may change. But it
-    // costs you playback, so it is opt-in.
+    // It demonstrably WORKS: verified stripping adPlacements and playerAds from
+    // real responses, with zero ads reaching playback afterwards.
+    //
+    // Whether YouTube detects it is genuinely unresolved. An anti-adblock wall
+    // appeared during testing, but another ad blocker doing network-level
+    // blocking was installed at the time, and YouTube's flag persists across
+    // reloads — so the evidence never cleanly separated the two. It has since
+    // run with no wall at all. Off by default is the cautious choice for
+    // someone installing this fresh; turn it on and watch for the wall.
     stripAdSchedule: false,
     badge: false,
   };
@@ -61,12 +61,24 @@
   // and if these names ever change the extension simply stops seeking rather
   // than destroying playback. Failing towards "ads get through" is the correct
   // direction for this one.
+  // Every entry here was OBSERVED on a real ad and reported by the extension's
+  // own capture — none are guesses. Two distinct ad layouts have been seen:
+  // one carrying ytp-ad-player-overlay-layout, and one carrying only the badge
+  // and hover-text furniture. The second matched nothing on the original list,
+  // so seeking was refused on it while skipping still worked.
   const AD_MARKERS = [
     ".ytp-ad-player-overlay",
     ".ytp-ad-player-overlay-layout",
     ".ytp-ad-preview-container",
     ".ytp-ad-simple-ad-badge",
     ".ytp-ad-duration-remaining",
+    // observed on the second layout
+    ".ytp-ad-badge--clean-player",
+    ".ytp-ad-info-hover-text-button",
+    ".ytp-ad-details-line",
+    ".ytp-ad-avatar",
+    ".ytp-ad-module",
+    ".video-ads",
   ].join(", ");
   const SKIP_BUTTONS = [
     ".ytp-ad-skip-button",
