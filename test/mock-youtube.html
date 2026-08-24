@@ -313,12 +313,29 @@
         };
         const ageGated = window.ytInitialPlayerResponse;
 
+        // The live failure mode: the response arrives CLEAN, and the block is
+        // written into it afterwards. Repairing once on arrival misses it
+        // entirely, which is exactly what happened on youtube.com.
+        window.ytInitialPlayerResponse = {
+          playabilityStatus: { status: "OK" },
+          streamingData: { formats: [{ itag: 18 }] },
+        };
+        const late = window.ytInitialPlayerResponse;
+        late.playabilityStatus = {
+          status: "ERROR",
+          errorScreen: { ytPlayerErrorMessageRenderer: {
+            reason: { runs: [{ text: "Ad blockers violate YouTube's Terms of Service" }] },
+          } },
+        };
+        const lateStatus = late.playabilityStatus.status;
+
         r = check("Anti-adblock wall", [
           ["wall response repaired to OK", walled.playabilityStatus.status, "OK"],
           ["ad schedule stripped from it too", "adPlacements" in walled, false],
           ["playback data kept", !!walled.streamingData, true],
           ["age gate NOT touched", ageGated.playabilityStatus.status, "LOGIN_REQUIRED"],
-          ["wall counter published", document.documentElement.getAttribute("data-ytac-walls"), "1"],
+          ["block written in AFTER arrival is repaired", lateStatus, "OK"],
+          ["wall counter published", !!document.documentElement.getAttribute("data-ytac-walls"), true],
         ]);
         html += r.html; allOk = allOk && r.ok;
 

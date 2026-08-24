@@ -75,33 +75,87 @@
    * Only ad-blocker enforcement is touched, matched on the wording. Every
    * other reason a video will not play is left exactly as YouTube sent it.
    */
-  function repairPlayability(data) {
-    const ps = data && data.playabilityStatus;
-    if (!ps || typeof ps !== "object") return false;
+  /**
+   * A repaired copy of a walled playabilityStatus, or null to leave it alone.
+   * Pure: no side effects, so it is safe to call from a property setter.
+   */
+  function repairedStatus(ps) {
+    if (!ps || typeof ps !== "object") return null;
     const status = String(ps.status || "");
-    if (!status || status === "OK") return false;
+    if (!status || status === "OK") return null;
 
     let blob = "";
     try {
       blob = JSON.stringify(ps);
     } catch {
-      return false;
+      return null;
     }
-    if (!WALL_HINTS.test(blob)) return false; // a genuine block: leave it alone
+    if (!WALL_HINTS.test(blob)) return null; // a genuine block: leave it alone
 
-    data.playabilityStatus = {
+    return {
       status: "OK",
       playableInEmbed: ps.playableInEmbed !== false,
       ...(ps.miniplayer ? { miniplayer: ps.miniplayer } : {}),
       ...(ps.contextParams ? { contextParams: ps.contextParams } : {}),
     };
+  }
+
+  function notePlayabilityRepair() {
     wallsCleared++;
     try {
       document.documentElement.setAttribute("data-ytac-walls", String(wallsCleared));
     } catch {
       /* reporting must never break playback */
     }
-    return true;
+  }
+
+  /**
+   * Repair the block, and KEEP it repaired.
+   *
+   * Observed live: the response YouTube embeds in the page arrives clean, and
+   * the block is written into that same object afterwards by assigning a new
+   * playabilityStatus to it. Repairing once on arrival therefore catches
+   * nothing — the field has to be watched, not just read.
+   *
+   * The accessor is installed on the response object itself, so any later
+   * replacement of that field is repaired as it lands.
+   */
+  function repairPlayability(data) {
+    if (!data || typeof data !== "object") return false;
+
+    let current = data.playabilityStatus;
+    let repairedAny = false;
+
+    const fix = (value) => {
+      const better = repairedStatus(value);
+      if (!better) return value;
+      notePlayabilityRepair();
+      repairedAny = true;
+      return better;
+    };
+
+    current = fix(current);
+
+    try {
+      Object.defineProperty(data, "playabilityStatus", {
+        configurable: true,
+        enumerable: true,
+        get() {
+          return current;
+        },
+        set(value) {
+          current = fix(value);
+        },
+      });
+    } catch {
+      // Cannot watch it; at least leave the one-off repair in place.
+      try {
+        data.playabilityStatus = current;
+      } catch {
+        /* nothing more to do */
+      }
+    }
+    return repairedAny;
   }
 
   /**
