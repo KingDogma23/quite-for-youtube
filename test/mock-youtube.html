@@ -122,8 +122,15 @@
         hiddenOverlayClicked = true;
       });
     </script>
-    <script src="../inject.js"></script>
-    <script src="../content.js"></script>
+    <!-- Loaded with a cache-buster: the browser will otherwise serve a stale
+         copy of the script under test while the page itself reloads, which
+         silently tests the PREVIOUS build. document.write keeps them ordered
+         and synchronous, exactly like plain tags. -->
+    <script>
+      for (const src of ["../inject.js", "../content.js"]) {
+        document.write('<script src="' + src + '?t=' + Date.now() + '"><\/script>');
+      }
+    </script>
     <script>
       const out = document.getElementById("results");
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -273,6 +280,45 @@
           ["ad keys present before", stripped.before, 3],
           ["ad keys gone after", stripped.after, 0],
           ["playback data preserved", stripped.keepsVideo, true],
+        ]);
+        html += r.html; allOk = allOk && r.ok;
+
+        // --- the anti-adblock wall ------------------------------------------
+        // Exercises the REAL injector, not a copy of it: inject.js intercepts
+        // assignment to ytInitialPlayerResponse, which is how the wall actually
+        // arrives — embedded in the page's HTML, never fetched. Every earlier
+        // build missed it for exactly that reason.
+        window.ytInitialPlayerResponse = {
+          playabilityStatus: {
+            status: "ERROR",
+            reason: "Ad blockers violate YouTube's Terms of Service",
+            errorScreen: { ytPlayerErrorMessageRenderer: {
+              subreason: { runs: [{ text: "Video playback is blocked unless YouTube is allowlisted" }] },
+            } },
+          },
+          streamingData: { formats: [{ itag: 18 }] },
+          adPlacements: [{ adPlacementRenderer: {} }],
+        };
+        const walled = window.ytInitialPlayerResponse;
+
+        // A video blocked for any OTHER reason must stay blocked. Repairing
+        // those would not be ad blocking, it would be breaking YouTube.
+        window.ytInitialPlayerResponse = {
+          playabilityStatus: {
+            status: "LOGIN_REQUIRED",
+            reason: "Sign in to confirm your age",
+            errorScreen: {},
+          },
+          streamingData: { formats: [{ itag: 18 }] },
+        };
+        const ageGated = window.ytInitialPlayerResponse;
+
+        r = check("Anti-adblock wall", [
+          ["wall response repaired to OK", walled.playabilityStatus.status, "OK"],
+          ["ad schedule stripped from it too", "adPlacements" in walled, false],
+          ["playback data kept", !!walled.streamingData, true],
+          ["age gate NOT touched", ageGated.playabilityStatus.status, "LOGIN_REQUIRED"],
+          ["wall counter published", document.documentElement.getAttribute("data-ytac-walls"), "1"],
         ]);
         html += r.html; allOk = allOk && r.ok;
 

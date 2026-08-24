@@ -1,6 +1,6 @@
 const DEFAULTS = {
   enabled: true,
-  stripAdSchedule: false,
+  stripAdSchedule: true,
   skipVideoAds: true,
   hideFeedAds: true,
   hideOverlays: true,

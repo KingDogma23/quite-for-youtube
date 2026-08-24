@@ -45,21 +45,72 @@
     }
   }
 
-  /** Remove the ad schedule from a player response. Returns null if untouched. */
-  function stripAds(text) {
-    // Off switch, read from the DOM because chrome.storage is unreachable from
-    // the page world. Without this the stripper ran even with the extension's
-    // master switch off, which made it impossible to test what it was causing.
+  // Phrases YouTube uses when it is blocking playback BECAUSE of an ad blocker.
+  // Deliberately narrow: a video that is private, age-gated, geo-blocked or
+  // taken down must stay blocked. Repairing those would be breaking YouTube
+  // rather than removing an ad.
+  const WALL_HINTS =
+    /ad ?block|allow ?list|allowlist|ads (allow|help)|violate|disable.{0,20}blocker/i;
+
+  /** Is the extension switched on at all? Master switch, read from the DOM. */
+  function enabled() {
     try {
-      if (document.documentElement.hasAttribute("data-ytac-strip-off")) return null;
+      return !document.documentElement.hasAttribute("data-ytac-all-off");
     } catch {
-      /* if the DOM is not ready yet, default to stripping */
+      return true;
     }
-    if (typeof text !== "string" || text.length < 2) return null;
-    if (!AD_KEYS.some((k) => text.includes(`"${k}"`))) return null;
+  }
+
+  let wallsCleared = 0;
+
+  /**
+   * Undo YouTube's anti-adblock block on a player response.
+   *
+   * `playabilityStatus` is the field that carries "playback is blocked unless
+   * you allowlist us". Stripping the ad schedule does nothing about it, which
+   * is why the wall survived every earlier build: the enforcement is a
+   * SEPARATE response from the ads themselves, and arrives whether or not any
+   * ad was removed.
+   *
+   * Only ad-blocker enforcement is touched, matched on the wording. Every
+   * other reason a video will not play is left exactly as YouTube sent it.
+   */
+  function repairPlayability(data) {
+    const ps = data && data.playabilityStatus;
+    if (!ps || typeof ps !== "object") return false;
+    const status = String(ps.status || "");
+    if (!status || status === "OK") return false;
+
+    let blob = "";
     try {
-      const data = JSON.parse(text);
-      let hit = false;
+      blob = JSON.stringify(ps);
+    } catch {
+      return false;
+    }
+    if (!WALL_HINTS.test(blob)) return false; // a genuine block: leave it alone
+
+    data.playabilityStatus = {
+      status: "OK",
+      playableInEmbed: ps.playableInEmbed !== false,
+      ...(ps.miniplayer ? { miniplayer: ps.miniplayer } : {}),
+      ...(ps.contextParams ? { contextParams: ps.contextParams } : {}),
+    };
+    wallsCleared++;
+    try {
+      document.documentElement.setAttribute("data-ytac-walls", String(wallsCleared));
+    } catch {
+      /* reporting must never break playback */
+    }
+    return true;
+  }
+
+  /**
+   * Clean one parsed player response in place: ad schedule out, wall undone.
+   * Returns true if anything changed.
+   */
+  function cleanObject(data) {
+    let hit = false;
+    if (!stripOff()) {
       for (const k of AD_KEYS) {
         if (k in data) {
           delete data[k];
@@ -70,8 +121,57 @@
         delete data.playerConfig.adConfig;
         hit = true;
       }
-      if (!hit) return null;
-      stripped++;
+      if (hit) stripped++;
+    }
+    // The wall is undone whenever the extension is on: it is a repair, not an
+    // ad-blocking feature, and it must work even with stripping switched off.
+    if (enabled() && repairPlayability(data)) hit = true;
+    return hit;
+  }
+
+  /** Is ad-schedule stripping switched off? */
+  function stripOff() {
+    try {
+      return document.documentElement.hasAttribute("data-ytac-strip-off");
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * The initial player response is EMBEDDED IN THE HTML, not fetched — so the
+   * fetch and XHR patches below never see the first video you load, which is
+   * exactly when the wall appears. Intercepting the assignment catches it.
+   */
+  let initialResponse;
+  try {
+    Object.defineProperty(window, "ytInitialPlayerResponse", {
+      configurable: true,
+      get() {
+        return initialResponse;
+      },
+      set(value) {
+        try {
+          if (value && typeof value === "object") cleanObject(value);
+        } catch {
+          /* never block the assignment */
+        }
+        initialResponse = value;
+      },
+    });
+  } catch {
+    /* if the property cannot be redefined, the fetch paths still apply */
+  }
+
+  /** Remove the ad schedule from a player response. Returns null if untouched. */
+  function stripAds(text) {
+    if (typeof text !== "string" || text.length < 2) return null;
+    // Worth parsing if it carries an ad schedule OR a playability decision.
+    if (!AD_KEYS.some((k) => text.includes(`"${k}"`)) &&
+        !text.includes('"playabilityStatus"')) return null;
+    try {
+      const data = JSON.parse(text);
+      if (!cleanObject(data)) return null;
       publish(AD_KEYS.filter((k) => text.includes(`"${k}"`)));
       return JSON.stringify(data);
     } catch {

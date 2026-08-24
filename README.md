@@ -33,7 +33,7 @@ Click the extension icon. Changes apply immediately.
 | --- | --- | --- |
 | Extension on | on | Master switch |
 | Skip video ads | on | Clicks Skip, seeks past unskippable ads |
-| Stop ads loading | off | Stops ads being queued for the player at all. YouTube detects this and blocks playback — see below |
+| Stop ads loading | on | Stops ads being queued for the player at all, and undoes YouTube's anti-adblock block — see below |
 | Hide feed & search ads | on | Homepage, sidebar, search, masthead |
 | Hide player overlays | on | Banners on top of the video |
 | Hide merch shelves | off | Product shelves under videos |
@@ -52,16 +52,23 @@ that never touches anything longer than three minutes, because that is not an
 ad. You briefly see an ad begin. Verified on live ads — 37 in one session, 35
 skipped, 2 fast-forwarded, 2 seeked, zero false seeks.
 
-**Stop ads loading** is **off by default, and should probably stay off.** It
-stops ads being queued for the player at all, so most never reach playback —
-but YouTube detects it and responds with a wall that blocks video playback
-entirely until you disable the extension. That was reproduced with this as the
-only ad blocker running. A setting that can stop video playing is a worse
-default than one that lets an ad start and skips it, so it is opt-in for anyone
-who wants to take that risk knowingly.
+**Stop ads loading** (on by default) stops ads being queued for the player at
+all, so most never reach playback.
 
-If you turn it on and hit the wall: untick it and reload the tab, twice if
-necessary — YouTube's flag persists for a reload or two.
+YouTube responds to this with a wall: "Ad blockers violate YouTube's Terms of
+Service", and playback stops. That block is a decision carried in the player
+response, separate from the ads themselves, and it arrives embedded in the
+page rather than fetched — which is why it survives having the ad blocking
+switched off. The extension now undoes that decision, and only that one: a
+video blocked because it is private, age-gated, geo-restricted or removed stays
+blocked, exactly as YouTube sent it.
+
+**The flag is sticky.** Once YouTube has flagged a session it keeps showing the
+wall for a while even after the cause is removed, so a change here can take
+several minutes and a couple of reloads to show its true effect. Both of us
+misread that as "the fix did nothing" more than once.
+
+If the wall does persist: untick this option, and give it a few minutes.
 
 **Running two ad blockers is worse than running one.** Any network-level
 blocker will trigger the same wall, and with both installed you cannot tell

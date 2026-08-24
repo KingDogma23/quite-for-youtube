@@ -40,16 +40,12 @@
     // It demonstrably WORKS: verified stripping the ad schedule from real
     // responses, with zero ads reaching playback afterwards.
     //
-    // OFF by default, because YouTube detects it. The anti-adblock wall that
-    // blocks playback entirely was reproduced with this as the only ad blocker
-    // running — an earlier sighting was ambiguous because a second, network
-    // -level blocker was installed at the time, but that one was disabled for
-    // this one, and the wall still appeared.
-    //
-    // A default that can stop video playing outright is a worse default than
-    // one that lets an ad start and then skips it, however much less effective
-    // it is. Available to anyone who wants to take the risk knowingly.
-    stripAdSchedule: false,
+    // On by default again. Stripping was never what summoned the anti-adblock
+    // wall: the wall arrived with stripping switched OFF too, because the
+    // enforcement is a separate decision carried in playabilityStatus, and it
+    // is embedded in the page's HTML rather than fetched. inject.js now undoes
+    // that decision, so the reason for making this opt-in no longer holds.
+    stripAdSchedule: true,
     badge: false,
   };
 
@@ -437,6 +433,10 @@
     const off = (name, on) =>
       on ? root.removeAttribute(name) : root.setAttribute(name, "1");
 
+    // Master switch, so the page-world script can tell "extension off" from
+    // "this one feature off". The wall repair keys off this and nothing else.
+    off("data-ytac-all-off", settings.enabled);
+
     off("data-ytac-feed-off", settings.enabled && settings.hideFeedAds);
     off("data-ytac-overlay-off", settings.enabled && settings.hideOverlays);
     // Stripping is opt-OUT: attribute present means DO NOT strip.
@@ -510,27 +510,27 @@
 
   loadLifetime();
 
-  // One-time correction for installs that already have ad-schedule stripping
-  // switched on. Changing the default only affects NEW installs, and leaving
-  // an existing install in a state that YouTube blocks playback for is not
-  // acceptable — so it is turned off once, and once only. Anyone who wants it
-  // back can re-tick it and it will stay ticked.
+  // 0.7.1 turned stripping off for existing installs, on the mistaken reading
+  // that it caused the wall. That is now handled properly, so the setting is
+  // restored once — and only for profiles that 0.7.1 actually changed.
   const STRIP_OFF_ONCE = "stripDefaultedOffV1";
+  const STRIP_RESTORED = "stripRestoredV2";
 
-  chrome.storage.sync.get({ ...DEFAULTS, [STRIP_OFF_ONCE]: false }, (stored) => {
-    if (!stored[STRIP_OFF_ONCE]) {
-      const wasOn = stored.stripAdSchedule;
-      stored.stripAdSchedule = false;
-      chrome.storage.sync.set({
-        [STRIP_OFF_ONCE]: true,
-        ...(wasOn ? { stripAdSchedule: false } : {}),
-      });
+  chrome.storage.sync.get(
+    { ...DEFAULTS, [STRIP_OFF_ONCE]: false, [STRIP_RESTORED]: false },
+    (stored) => {
+      if (stored[STRIP_OFF_ONCE] && !stored[STRIP_RESTORED]) {
+        stored.stripAdSchedule = true;
+        chrome.storage.sync.set({ [STRIP_RESTORED]: true, stripAdSchedule: true });
+      } else if (!stored[STRIP_RESTORED]) {
+        chrome.storage.sync.set({ [STRIP_RESTORED]: true });
+      }
+      settings = { ...DEFAULTS, ...stored };
+      applyCssToggles();
+      if (document.body) start();
+      else document.addEventListener("DOMContentLoaded", start, { once: true });
     }
-    settings = { ...DEFAULTS, ...stored };
-    applyCssToggles();
-    if (document.body) start();
-    else document.addEventListener("DOMContentLoaded", start, { once: true });
-  });
+  );
 
   chrome.storage.onChanged.addListener((changes, area) => {
     // Resetting the counters from the popup writes to local; without this the
