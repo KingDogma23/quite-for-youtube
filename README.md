@@ -52,14 +52,15 @@ that never touches anything longer than three minutes, because that is not an
 ad. You briefly see an ad begin. Verified on live ads — 37 in one session, 35
 skipped, 2 fast-forwarded, 2 seeked, zero false seeks.
 
-**Strip ad schedule** (off by default) removes the ad schedule from the
+**Strip ad schedule** (on by default) removes the ad schedule from the
 player's response before the page reads it, so no ad is ever queued. It works —
 verified removing `adPlacements` and `playerAds` from real responses with zero
 ads reaching playback. Whether YouTube reliably detects it is unresolved: an
 anti-adblock wall appeared during testing, but a second, network-blocking ad
 blocker was installed at the time and YouTube's flag persists across reloads,
-so the two were never cleanly separated. It has since run without a wall. Off
-by default is the cautious choice; turn it on and see.
+so the two were never cleanly separated. It has since run without a wall. If you ever see
+one, turn this off first — it is the most likely cause, and the skip/fast-forward
+path below keeps working without it.
 
 **Running two ad blockers is worse than running one.** Any network-level
 blocker will trigger the same wall, and with both installed you cannot tell

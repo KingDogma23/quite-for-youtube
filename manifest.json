@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YT Ad Cleaner",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Removes ads from YouTube: skips video ads, and hides feed, sidebar, search and overlay ads.",
   "permissions": [
     "storage"

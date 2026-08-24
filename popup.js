@@ -4,7 +4,7 @@ const DEFAULTS = {
   hideFeedAds: true,
   hideOverlays: true,
   hideMerch: false,
-  stripAdSchedule: false,
+  stripAdSchedule: true,
   badge: false,
 };
 

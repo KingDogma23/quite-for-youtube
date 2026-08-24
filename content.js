@@ -34,7 +34,8 @@
     hideMerch: false,
     // The page-world ad-schedule stripper.
     //
-    // OFF by default — conservatively, not conclusively.
+    // ON by default. It is the better mechanism when it works: no ad is ever
+    // queued, so nothing has to be skipped, sped up or seeked past.
     //
     // It demonstrably WORKS: verified stripping adPlacements and playerAds from
     // real responses, with zero ads reaching playback afterwards.
@@ -43,9 +44,9 @@
     // appeared during testing, but another ad blocker doing network-level
     // blocking was installed at the time, and YouTube's flag persists across
     // reloads — so the evidence never cleanly separated the two. It has since
-    // run with no wall at all. Off by default is the cautious choice for
-    // someone installing this fresh; turn it on and watch for the wall.
-    stripAdSchedule: false,
+    // run with no wall at all. Switching it off is the first thing to try for
+    // someone who hits the wall; the popup explains how to turn it off.
+    stripAdSchedule: true,
     badge: false,
   };
 
