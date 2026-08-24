@@ -4,13 +4,24 @@ A Chrome extension that removes ads from YouTube.
 
 | | |
 | --- | --- |
-| **Video ads** | Skip is clicked as soon as it appears; unskippable ads are fast-forwarded. See the note below on why ads are not removed outright |
+| **Video ads** | Skip is clicked as soon as it appears; unskippable ads are fast-forwarded |
 | **Feed & search ads** | Homepage, sidebar, search results, masthead banner |
 | **Player overlays** | Banners drawn on top of the video |
 | **Merch shelves** | Product shelves under videos (optional, off by default) |
 
-No network-level blocking and no filter lists by default. Everything returns
-the moment you switch it off.
+**This is not a full ad blocker, and does not try to be.** It never touches a
+network request and never modifies YouTube's responses. Ads load; they are
+skipped, fast-forwarded, or hidden. Everything returns the moment you switch it
+off.
+
+Earlier versions did strip the ad schedule out of the player's responses.
+That works, and YouTube detects it: the result is a wall that blocks playback
+until the extension is disabled, and the flag persists for minutes after the
+cause is removed. Trying to undo that block client-side produces a video that
+will not play at all, because YouTube simply stops serving usable stream data
+to a flagged session. That whole approach has been removed rather than left in
+as a tempting switch. If you want ads blocked at the network layer, use a
+maintained ad blocker — that is a continuously updated product, not a setting.
 
 ## Install
 
@@ -33,7 +44,6 @@ Click the extension icon. Changes apply immediately.
 | --- | --- | --- |
 | Extension on | on | Master switch |
 | Skip video ads | on | Clicks Skip, seeks past unskippable ads |
-| Stop ads loading | on | Stops ads being queued for the player at all, and undoes YouTube's anti-adblock block — see below |
 | Hide feed & search ads | on | Homepage, sidebar, search, masthead |
 | Hide player overlays | on | Banners on top of the video |
 | Hide merch shelves | off | Product shelves under videos |
@@ -51,24 +61,6 @@ it appears, unskippable ads are fast-forwarded, and seeking is a last resort
 that never touches anything longer than three minutes, because that is not an
 ad. You briefly see an ad begin. Verified on live ads — 37 in one session, 35
 skipped, 2 fast-forwarded, 2 seeked, zero false seeks.
-
-**Stop ads loading** (on by default) stops ads being queued for the player at
-all, so most never reach playback.
-
-YouTube responds to this with a wall: "Ad blockers violate YouTube's Terms of
-Service", and playback stops. That block is a decision carried in the player
-response, separate from the ads themselves, and it arrives embedded in the
-page rather than fetched — which is why it survives having the ad blocking
-switched off. The extension now undoes that decision, and only that one: a
-video blocked because it is private, age-gated, geo-restricted or removed stays
-blocked, exactly as YouTube sent it.
-
-**The flag is sticky.** Once YouTube has flagged a session it keeps showing the
-wall for a while even after the cause is removed, so a change here can take
-several minutes and a couple of reloads to show its true effect. Both of us
-misread that as "the fix did nothing" more than once.
-
-If the wall does persist: untick this option, and give it a few minutes.
 
 **Running two ad blockers is worse than running one.** Any network-level
 blocker will trigger the same wall, and with both installed you cannot tell

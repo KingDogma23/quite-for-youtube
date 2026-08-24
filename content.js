@@ -32,20 +32,6 @@
     hideFeedAds: true,
     hideOverlays: true,
     hideMerch: false,
-    // The page-world ad-schedule stripper.
-    //
-    // ON by default. It is the better mechanism when it works: no ad is ever
-    // queued, so nothing has to be skipped, sped up or seeked past.
-    //
-    // It demonstrably WORKS: verified stripping the ad schedule from real
-    // responses, with zero ads reaching playback afterwards.
-    //
-    // On by default again. Stripping was never what summoned the anti-adblock
-    // wall: the wall arrived with stripping switched OFF too, because the
-    // enforcement is a separate decision carried in playabilityStatus, and it
-    // is embedded in the page's HTML rather than fetched. inject.js now undoes
-    // that decision, so the reason for making this opt-in no longer holds.
-    stripAdSchedule: true,
     badge: false,
   };
 
@@ -115,7 +101,7 @@
    * estimated from an average.
    */
   const LIFETIME_KEY = "quietLifetime";
-  let lifetime = { adsBlocked: 0, secondsSaved: 0, schedulesStripped: 0, since: null };
+  let lifetime = { adsBlocked: 0, secondsSaved: 0, adsSkipped: 0, since: null };
   let lifetimeDirty = false;
 
   function loadLifetime() {
@@ -131,6 +117,7 @@
 
   function recordAd(seconds) {
     lifetime.adsBlocked++;
+    lifetime.adsSkipped = (lifetime.adsSkipped || 0) + 1;
     if (Number.isFinite(seconds) && seconds > 0 && seconds < 600) {
       lifetime.secondsSaved += seconds;
     }
@@ -439,13 +426,6 @@
 
     off("data-ytac-feed-off", settings.enabled && settings.hideFeedAds);
     off("data-ytac-overlay-off", settings.enabled && settings.hideOverlays);
-    // Stripping is opt-OUT: attribute present means DO NOT strip.
-    if (settings.enabled && settings.stripAdSchedule) {
-      root.removeAttribute("data-ytac-strip-off");
-    } else {
-      root.setAttribute("data-ytac-strip-off", "1");
-    }
-
     // Merch is opt-IN, so the attribute is present only when it should hide.
     if (settings.enabled && settings.hideMerch) root.setAttribute("data-ytac-merch-off", "1");
     else root.removeAttribute("data-ytac-merch-off");
@@ -453,28 +433,10 @@
 
   // ------------------------------------------------------------------- loop
 
-  let lastStripCount = 0;
-
-  function syncStripCount() {
-    const n = Number(document.documentElement.getAttribute("data-ytac-stripped") || 0);
-    if (n > lastStripCount) {
-      // Each stripped schedule is an ad that never played. Duration is unknown
-      // by definition — it was removed before the player ever saw it — so a
-      // conservative 20s is credited rather than nothing or an inflated guess.
-      const newly = n - lastStripCount;
-      lifetime.schedulesStripped += newly;
-      lifetime.adsBlocked += newly;
-      lifetime.secondsSaved += newly * 20;
-      lifetimeDirty = true;
-      lastStripCount = n;
-    }
-  }
-
   function tick() {
     if (!settings.enabled) return;
     try {
       if (!adIsPlaying()) seekAttempts = 0; // ad break over; restore the budget
-      syncStripCount();
       revertFalseSeek();
       restoreSpeed();
       observePlayer();
@@ -510,36 +472,18 @@
 
   loadLifetime();
 
-  // 0.7.1 turned stripping off for existing installs, on the mistaken reading
-  // that it caused the wall. That is now handled properly, so the setting is
-  // restored once — and only for profiles that 0.7.1 actually changed.
-  const STRIP_OFF_ONCE = "stripDefaultedOffV1";
-  const STRIP_RESTORED = "stripRestoredV2";
-
-  chrome.storage.sync.get(
-    { ...DEFAULTS, [STRIP_OFF_ONCE]: false, [STRIP_RESTORED]: false },
-    (stored) => {
-      if (stored[STRIP_OFF_ONCE] && !stored[STRIP_RESTORED]) {
-        stored.stripAdSchedule = true;
-        chrome.storage.sync.set({ [STRIP_RESTORED]: true, stripAdSchedule: true });
-      } else if (!stored[STRIP_RESTORED]) {
-        chrome.storage.sync.set({ [STRIP_RESTORED]: true });
-      }
-      settings = { ...DEFAULTS, ...stored };
-      applyCssToggles();
-      if (document.body) start();
-      else document.addEventListener("DOMContentLoaded", start, { once: true });
-    }
-  );
+  chrome.storage.sync.get(DEFAULTS, (stored) => {
+    settings = { ...DEFAULTS, ...stored };
+    applyCssToggles();
+    if (document.body) start();
+    else document.addEventListener("DOMContentLoaded", start, { once: true });
+  });
 
   chrome.storage.onChanged.addListener((changes, area) => {
     // Resetting the counters from the popup writes to local; without this the
     // running page keeps its old totals until the tab is reloaded.
     if (area === "local" && changes[LIFETIME_KEY]) {
       lifetime = { ...lifetime, ...(changes[LIFETIME_KEY].newValue || {}) };
-      lastStripCount = Number(
-        document.documentElement.getAttribute("data-ytac-stripped") || 0
-      );
       return;
     }
     if (area !== "sync") return;
@@ -556,14 +500,6 @@
         settings: { ...settings },
         session: { ...session },
         lifetime: { ...lifetime },
-        // Read across from the page-world script via shared DOM attributes.
-        stripper: {
-          adSchedulesStripped: Number(
-            document.documentElement.getAttribute("data-ytac-stripped") || 0
-          ),
-          lastKeysStripped:
-            document.documentElement.getAttribute("data-ytac-lastkeys") || "(none yet)",
-        },
         page: {
           playerFound: !!player(),
           adPlayingNow: adIsPlaying(),

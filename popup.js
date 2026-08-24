@@ -1,6 +1,5 @@
 const DEFAULTS = {
   enabled: true,
-  stripAdSchedule: true,
   skipVideoAds: true,
   hideFeedAds: true,
   hideOverlays: true,
@@ -54,22 +53,18 @@ function render(d) {
 
   $("ver").textContent = "v" + d.version;
 
-  const lt = d.lifetime || { adsBlocked: 0, secondsSaved: 0, schedulesStripped: 0 };
+  const lt = d.lifetime || { adsBlocked: 0, secondsSaved: 0, adsSkipped: 0 };
   $("sAds").textContent = compact(lt.adsBlocked || 0);
   $("sTime").textContent = humanTime(lt.secondsSaved);
-  $("sClean").textContent = compact(lt.schedulesStripped || 0);
+  $("sClean").textContent = compact(lt.adsSkipped || 0);
 
   const s = d.session;
   const reached = s.videoAdsSkipped + s.videoAdsSeeked;
   lastReport = [
     `Quiet for YouTube v${d.version}  (page ${d.url})`,
     `all time: ${lt.adsBlocked} ads stopped, ${humanTime(lt.secondsSaved)} saved, ` +
-      `${lt.schedulesStripped} schedules stripped`,
+      `${lt.adsSkipped || 0} ads skipped`,
     `on: ${Object.entries(d.settings).filter(([, v]) => v).map(([k]) => k).join(", ") || "nothing"}`,
-    d.settings.stripAdSchedule
-      ? `this session — schedules stripped: ${d.stripper?.adSchedulesStripped ?? "?"} ` +
-        `[${d.stripper?.lastKeysStripped ?? "?"}]`
-      : `this session — ad schedule stripping is OFF`,
     `video ads reaching playback: ${reached} ` +
       `(${s.videoAdsSkipped} skipped, ${s.spedUp ?? 0} sped up, ${s.videoAdsSeeked} seeked)`,
     `false seeks reverted: ${s.falseSeeksReverted ?? 0}   (should always be 0)`,
@@ -114,7 +109,7 @@ $("copy").addEventListener("click", async (e) => {
 
 $("reset").addEventListener("click", (e) => {
   chrome.storage.local.set({
-    quietLifetime: { adsBlocked: 0, secondsSaved: 0, schedulesStripped: 0, since: Date.now() },
+    quietLifetime: { adsBlocked: 0, secondsSaved: 0, adsSkipped: 0, since: Date.now() },
   });
   e.target.textContent = "Reset";
   setTimeout(() => {

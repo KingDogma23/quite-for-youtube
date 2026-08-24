@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Quiet for YouTube",
-  "version": "0.8.1",
-  "description": "Removes ads from YouTube: stops them loading, skips video ads, and hides feed, sidebar, search and Shorts ads.",
+  "version": "0.9.0",
+  "description": "Cleans up YouTube: skips video ads, and hides feed, sidebar, search and Shorts ad panels.",
   "permissions": [
     "storage"
   ],
@@ -10,17 +10,6 @@
     "*://*.youtube.com/*"
   ],
   "content_scripts": [
-    {
-      "matches": [
-        "*://*.youtube.com/*"
-      ],
-      "js": [
-        "inject.js"
-      ],
-      "run_at": "document_start",
-      "world": "MAIN",
-      "all_frames": false
-    },
     {
       "matches": [
         "*://*.youtube.com/*"

@@ -127,7 +127,7 @@
          silently tests the PREVIOUS build. document.write keeps them ordered
          and synchronous, exactly like plain tags. -->
     <script>
-      for (const src of ["../inject.js", "../content.js"]) {
+      for (const src of ["../content.js"]) {
         document.write('<script src="' + src + '?t=' + Date.now() + '"><\/script>');
       }
     </script>
@@ -237,105 +237,6 @@
         vid.currentTime = 0;
         r = check("40-minute video must never be seeked", [
           ["playhead left alone despite ad signals", longUntouched, true],
-        ]);
-        html += r.html; allOk = allOk && r.ok;
-
-        // --- the ad SCHEDULE is stripped from the player response -----------
-        // This is the real defence: if no ad is scheduled, nothing needs
-        // skipping. Serve a fake /youtubei/v1/player payload and confirm the
-        // ad keys are gone by the time the page sees the response.
-        const fakePlayer = JSON.stringify({
-          videoDetails: { title: "Test", lengthSeconds: "212" },
-          adPlacements: [{ adPlacementRenderer: { config: "pre-roll" } }],
-          adSlots: [{ adSlotRenderer: {} }],
-          playerAds: [{ playerLegacyDesktopWatchAdsRenderer: {} }],
-          streamingData: { formats: [{ itag: 18 }] },
-        });
-        const blobUrl = URL.createObjectURL(new Blob([fakePlayer], { type: "application/json" }));
-
-        // fetch path — the URL must look like the player endpoint
-        let fetchResult = null;
-        try {
-          const orig = window.fetch;
-          // route our fake URL through a wrapper that reports the matched path
-          const res = await fetch("/youtubei/v1/player?fake=1", { method: "POST" }).catch(() => null);
-          fetchResult = res;
-        } catch (e) { fetchResult = null; }
-
-        // Direct unit check of the stripper against the payload, which is what
-        // actually matters and does not depend on the test server answering.
-        const stripped = (() => {
-          const data = JSON.parse(fakePlayer);
-          const before = ["adPlacements", "adSlots", "playerAds"].filter(k => k in data);
-          // emulate exactly what inject.js does
-          for (const k of ["adPlacements", "adSlots", "playerAds", "adBreakHeartbeatParams"]) delete data[k];
-          const after = ["adPlacements", "adSlots", "playerAds"].filter(k => k in data);
-          return { before: before.length, after: after.length, keepsVideo: !!data.streamingData };
-        })();
-        URL.revokeObjectURL(blobUrl);
-
-        r = check("Ad schedule stripping", [
-          ["injector patched fetch", window.fetch !== undefined && typeof window.fetch === "function", true],
-          ["injector exposes counter", typeof window.__ytacStripped === "number", true],
-          ["ad keys present before", stripped.before, 3],
-          ["ad keys gone after", stripped.after, 0],
-          ["playback data preserved", stripped.keepsVideo, true],
-        ]);
-        html += r.html; allOk = allOk && r.ok;
-
-        // --- the anti-adblock wall ------------------------------------------
-        // Exercises the REAL injector, not a copy of it: inject.js intercepts
-        // assignment to ytInitialPlayerResponse, which is how the wall actually
-        // arrives — embedded in the page's HTML, never fetched. Every earlier
-        // build missed it for exactly that reason.
-        window.ytInitialPlayerResponse = {
-          playabilityStatus: {
-            status: "ERROR",
-            reason: "Ad blockers violate YouTube's Terms of Service",
-            errorScreen: { ytPlayerErrorMessageRenderer: {
-              subreason: { runs: [{ text: "Video playback is blocked unless YouTube is allowlisted" }] },
-            } },
-          },
-          streamingData: { formats: [{ itag: 18 }] },
-          adPlacements: [{ adPlacementRenderer: {} }],
-        };
-        const walled = window.ytInitialPlayerResponse;
-
-        // A video blocked for any OTHER reason must stay blocked. Repairing
-        // those would not be ad blocking, it would be breaking YouTube.
-        window.ytInitialPlayerResponse = {
-          playabilityStatus: {
-            status: "LOGIN_REQUIRED",
-            reason: "Sign in to confirm your age",
-            errorScreen: {},
-          },
-          streamingData: { formats: [{ itag: 18 }] },
-        };
-        const ageGated = window.ytInitialPlayerResponse;
-
-        // The live failure mode: the response arrives CLEAN, and the block is
-        // written into it afterwards. Repairing once on arrival misses it
-        // entirely, which is exactly what happened on youtube.com.
-        window.ytInitialPlayerResponse = {
-          playabilityStatus: { status: "OK" },
-          streamingData: { formats: [{ itag: 18 }] },
-        };
-        const late = window.ytInitialPlayerResponse;
-        late.playabilityStatus = {
-          status: "ERROR",
-          errorScreen: { ytPlayerErrorMessageRenderer: {
-            reason: { runs: [{ text: "Ad blockers violate YouTube's Terms of Service" }] },
-          } },
-        };
-        const lateStatus = late.playabilityStatus.status;
-
-        r = check("Anti-adblock wall", [
-          ["wall response repaired to OK", walled.playabilityStatus.status, "OK"],
-          ["ad schedule stripped from it too", "adPlacements" in walled, false],
-          ["playback data kept", !!walled.streamingData, true],
-          ["age gate NOT touched", ageGated.playabilityStatus.status, "LOGIN_REQUIRED"],
-          ["block written in AFTER arrival is repaired", lateStatus, "OK"],
-          ["wall counter published", !!document.documentElement.getAttribute("data-ytac-walls"), true],
         ]);
         html += r.html; allOk = allOk && r.ok;
 
