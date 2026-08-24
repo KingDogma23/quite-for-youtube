@@ -1,4 +1,4 @@
-# YT Ad Cleaner
+# Quiet for YouTube
 
 A Chrome extension that removes ads from YouTube.
 
@@ -9,9 +9,8 @@ A Chrome extension that removes ads from YouTube.
 | **Player overlays** | Banners drawn on top of the video |
 | **Merch shelves** | Product shelves under videos (optional, off by default) |
 
-Nothing is blocked at the network level and no requests are tampered with —
-ads load, they're just skipped or hidden. Everything returns the moment you
-switch it off.
+No network-level blocking and no filter lists. Everything returns the moment
+you switch it off.
 
 ## Install
 
@@ -34,6 +33,7 @@ Click the extension icon. Changes apply immediately.
 | --- | --- | --- |
 | Extension on | on | Master switch |
 | Skip video ads | on | Clicks Skip, seeks past unskippable ads |
+| Strip ad schedule | on | Stops ads being queued for the player at all |
 | Hide feed & search ads | on | Homepage, sidebar, search, masthead |
 | Hide player overlays | on | Banners on top of the video |
 | Hide merch shelves | off | Product shelves under videos |
@@ -41,8 +41,8 @@ Click the extension icon. Changes apply immediately.
 
 ## Worth knowing
 
-**Feed ads never paint at all.** They're hidden by a stylesheet that loads
-before the page renders, so there's no flicker and no scanning.
+**Feed ads never paint at all.** They are hidden before the page renders, so
+there is no flicker.
 
 **Two ways to deal with video ads, and one is opt-in.**
 
@@ -52,10 +52,10 @@ that never touches anything longer than three minutes, because that is not an
 ad. You briefly see an ad begin. Verified on live ads — 37 in one session, 35
 skipped, 2 fast-forwarded, 2 seeked, zero false seeks.
 
-**Strip ad schedule** (on by default) removes the ad schedule from the
-player's response before the page reads it, so no ad is ever queued. It works —
-verified removing `adPlacements` and `playerAds` from real responses with zero
-ads reaching playback. Whether YouTube reliably detects it is unresolved: an
+**Strip ad schedule** (on by default) stops ads being queued for the player in
+the first place, so most never reach playback at all. Verified against real
+sessions with zero ads reaching the player. Whether YouTube reliably detects it
+is unresolved: an
 anti-adblock wall appeared during testing, but a second, network-blocking ad
 blocker was installed at the time and YouTube's flag persists across reloads,
 so the two were never cleanly separated. It has since run without a wall. If you ever see
@@ -92,9 +92,8 @@ it can currently see in the player, with a **Copy report** button.
 The video path is not theoretical. On a live account it handled 37 ads in one
 session — 35 skipped via the button, 2 fast-forwarded where no Skip existed,
 2 seeked as a last resort, and **zero false seeks**, meaning the guard that
-protects your own video never misfired. The selectors it relies on
-(`.ytp-skip-ad-button`, `.ytp-ad-player-overlay-layout`) were confirmed against
-captured markup from those ads rather than assumed.
+protects your own video never misfired. Everything it relies on was confirmed
+against captured markup from those ads rather than assumed.
 
 ### Tests
 

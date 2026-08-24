@@ -115,7 +115,7 @@
   </head>
   <body>
     <div class="brand">
-      <img src="icons/icon48.png" alt="" />
+      <img src="../icons/icon48.png" alt="" />
       <h1>Quiet <span>for YouTube</span></h1>
       <span class="ver" id="ver">…</span>
     </div>
@@ -162,6 +162,25 @@
       </div>
     </details>
 
-    <script src="popup.js"></script>
+    <script>
+      window.chrome = {
+        storage: {
+          sync: { get: (d, cb) => cb({ ...d }), set: () => {} },
+          local: { set: () => {} },
+        },
+        tabs: { query: async () => [{ id: 1 }], sendMessage: async () => ({
+          version: "0.7.0", url: "/watch",
+          settings: { enabled: true, stripAdSchedule: true, skipVideoAds: true,
+                      hideFeedAds: true, hideOverlays: true, hideMerch: false, badge: false },
+          lifetime: { adsBlocked: 1284, secondsSaved: 9420, schedulesStripped: 613 },
+          session: { videoAdsSkipped: 35, videoAdsSeeked: 2, spedUp: 2, falseSeeksReverted: 0,
+                     overlaysClosed: 0, adSightings: [], firstAdSeen: null, lastAction: "clicked skip" },
+          stripper: { adSchedulesStripped: 3, lastKeysStripped: "adPlacements,playerAds" },
+          page: { playerFound: true, adPlayingNow: false, skipButtonVisible: false,
+                  feedAds: { inDom: 3, stillVisible: 0 } },
+        }) },
+      };
+    </script>
+    <script src="../popup.js"></script>
   </body>
 </html>

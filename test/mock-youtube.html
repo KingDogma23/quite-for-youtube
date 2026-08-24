@@ -70,6 +70,7 @@
             },
           },
           onChanged: { addListener: (cb) => (onChangedCb = cb) },
+          local: { get: (d, cb) => cb({ ...d }), set: () => {} },
         },
         runtime: {
           onMessage: { addListener: (f) => (window.__onMessage = f) },

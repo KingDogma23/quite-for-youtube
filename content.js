@@ -106,6 +106,45 @@
 
   // Session counters — the Facebook build proved these are worth having from
   // the first version, not bolted on after a week of guessing.
+  /**
+   * Lifetime totals, persisted to chrome.storage.local.
+   *
+   * Only things actually measured are recorded. Notably absent is "data
+   * blocked": this extension does not block requests, so any megabyte figure
+   * would be invented. Time saved IS real — each ad's duration is known from
+   * the player at the moment it is skipped, so it is summed rather than
+   * estimated from an average.
+   */
+  const LIFETIME_KEY = "quietLifetime";
+  let lifetime = { adsBlocked: 0, secondsSaved: 0, schedulesStripped: 0, since: null };
+  let lifetimeDirty = false;
+
+  function loadLifetime() {
+    chrome.storage.local.get({ [LIFETIME_KEY]: null }, (got) => {
+      const stored = got[LIFETIME_KEY];
+      if (stored) lifetime = { ...lifetime, ...stored };
+      if (!lifetime.since) {
+        lifetime.since = Date.now();
+        lifetimeDirty = true;
+      }
+    });
+  }
+
+  function recordAd(seconds) {
+    lifetime.adsBlocked++;
+    if (Number.isFinite(seconds) && seconds > 0 && seconds < 600) {
+      lifetime.secondsSaved += seconds;
+    }
+    lifetimeDirty = true;
+  }
+
+  // Batched: writing on every ad would hammer storage during a long session.
+  setInterval(() => {
+    if (!lifetimeDirty) return;
+    lifetimeDirty = false;
+    chrome.storage.local.set({ [LIFETIME_KEY]: lifetime });
+  }, 5000);
+
   const session = {
     videoAdsSkipped: 0,
     videoAdsSeeked: 0,
@@ -241,8 +280,13 @@
 
     const skip = p.querySelector(SKIP_BUTTONS);
     if (isVisible(skip)) {
+      const v = p.querySelector("video");
+      // Seconds actually avoided: what was left of the ad when Skip was hit.
+      const remaining =
+        v && Number.isFinite(v.duration) ? Math.max(v.duration - v.currentTime, 0) : 0;
       skip.click();
       session.videoAdsSkipped++;
+      recordAd(remaining);
       session.lastAction = "clicked skip";
       return;
     }
@@ -272,6 +316,7 @@
       video.playbackRate = 16;
       video.muted = true;
       session.spedUp++;
+      recordAd(Math.max(video.duration - video.currentTime, 0));
       session.lastAction = "fast-forwarding through ad";
       return;
     }
@@ -405,10 +450,28 @@
 
   // ------------------------------------------------------------------- loop
 
+  let lastStripCount = 0;
+
+  function syncStripCount() {
+    const n = Number(document.documentElement.getAttribute("data-ytac-stripped") || 0);
+    if (n > lastStripCount) {
+      // Each stripped schedule is an ad that never played. Duration is unknown
+      // by definition — it was removed before the player ever saw it — so a
+      // conservative 20s is credited rather than nothing or an inflated guess.
+      const newly = n - lastStripCount;
+      lifetime.schedulesStripped += newly;
+      lifetime.adsBlocked += newly;
+      lifetime.secondsSaved += newly * 20;
+      lifetimeDirty = true;
+      lastStripCount = n;
+    }
+  }
+
   function tick() {
     if (!settings.enabled) return;
     try {
       if (!adIsPlaying()) seekAttempts = 0; // ad break over; restore the budget
+      syncStripCount();
       revertFalseSeek();
       restoreSpeed();
       observePlayer();
@@ -442,6 +505,8 @@
     setInterval(tick, 400);
   }
 
+  loadLifetime();
+
   chrome.storage.sync.get(DEFAULTS, (stored) => {
     settings = { ...DEFAULTS, ...stored };
     applyCssToggles();
@@ -450,6 +515,15 @@
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
+    // Resetting the counters from the popup writes to local; without this the
+    // running page keeps its old totals until the tab is reloaded.
+    if (area === "local" && changes[LIFETIME_KEY]) {
+      lifetime = { ...lifetime, ...(changes[LIFETIME_KEY].newValue || {}) };
+      lastStripCount = Number(
+        document.documentElement.getAttribute("data-ytac-stripped") || 0
+      );
+      return;
+    }
     if (area !== "sync") return;
     for (const [k, { newValue }] of Object.entries(changes)) settings[k] = newValue;
     applyCssToggles();
@@ -463,6 +537,7 @@
         url: location.pathname,
         settings: { ...settings },
         session: { ...session },
+        lifetime: { ...lifetime },
         // Read across from the page-world script via shared DOM attributes.
         stripper: {
           adSchedulesStripped: Number(

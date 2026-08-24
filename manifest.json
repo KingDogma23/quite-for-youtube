@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "YT Ad Cleaner",
-  "version": "0.6.4",
-  "description": "Removes ads from YouTube: skips video ads, and hides feed, sidebar, search and overlay ads.",
+  "name": "Quiet for YouTube",
+  "version": "0.7.0",
+  "description": "Removes ads from YouTube: stops them loading, skips video ads, and hides feed, sidebar, search and Shorts ads.",
   "permissions": [
     "storage"
   ],
@@ -37,7 +37,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "YT Ad Cleaner"
+    "default_title": "Quiet for YouTube"
   },
   "icons": {
     "16": "icons/icon16.png",
