@@ -32,6 +32,10 @@
     hideFeedAds: true,
     hideOverlays: true,
     hideMerch: false,
+    // Rewrites the OUTGOING player request so YouTube answers without an ad
+    // schedule. Nothing in the response is edited, which is what kept every
+    // earlier attempt detectable. See inject.js.
+    stripAdSchedule: true,
     badge: false,
   };
 
@@ -424,6 +428,8 @@
     // "this one feature off". The wall repair keys off this and nothing else.
     off("data-ytac-all-off", settings.enabled);
 
+    off("data-ytac-strip-off", settings.enabled && settings.stripAdSchedule);
+
     off("data-ytac-feed-off", settings.enabled && settings.hideFeedAds);
     off("data-ytac-overlay-off", settings.enabled && settings.hideOverlays);
     // Merch is opt-IN, so the attribute is present only when it should hide.
@@ -500,6 +506,9 @@
         settings: { ...settings },
         session: { ...session },
         lifetime: { ...lifetime },
+        rewrites: Number(
+          document.documentElement.getAttribute("data-ytac-rewrites") || 0
+        ),
         page: {
           playerFound: !!player(),
           adPlayingNow: adIsPlaying(),

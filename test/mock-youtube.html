@@ -127,7 +127,7 @@
          silently tests the PREVIOUS build. document.write keeps them ordered
          and synchronous, exactly like plain tags. -->
     <script>
-      for (const src of ["../content.js"]) {
+      for (const src of ["../inject.js", "../content.js"]) {
         document.write('<script src="' + src + '?t=' + Date.now() + '"><\/script>');
       }
     </script>
@@ -237,6 +237,31 @@
         vid.currentTime = 0;
         r = check("40-minute video must never be seeked", [
           ["playhead left alone despite ad signals", longUntouched, true],
+        ]);
+        html += r.html; allOk = allOk && r.ok;
+
+        // --- the OUTGOING player request is rewritten ----------------------
+        // Exercises the real injector. The request is what gets changed; the
+        // response is never touched, which is the whole point — editing the
+        // response is what earlier versions did, and what YouTube detects.
+        const before = Number(document.documentElement.getAttribute("data-ytac-rewrites") || 0);
+        const watchReq = JSON.stringify({
+          context: { client: { clientName: "WEB", clientScreen: "WATCH" } },
+          videoId: "abc123",
+        });
+        const shareReq = JSON.stringify({
+          context: { client: { clientName: "WEB", isWebNativeShareAvailable: true } },
+        });
+        const unrelated = JSON.stringify({ hello: "world", clientScreen: "SOMETHING_ELSE" });
+        const after = Number(document.documentElement.getAttribute("data-ytac-rewrites") || 0);
+
+        r = check("Outbound request rewrite", [
+          ["watch request declared as ad unit", watchReq.includes('"clientScreen":"ADUNIT"'), true],
+          ["no WATCH screen left in it", watchReq.includes('"clientScreen":"WATCH"'), false],
+          ["share-shaped request also rewritten", shareReq.includes('"clientScreen":"ADUNIT"'), true],
+          ["unrelated JSON untouched", unrelated, '{"hello":"world","clientScreen":"SOMETHING_ELSE"}'],
+          ["still valid JSON", (() => { try { JSON.parse(watchReq); return true; } catch { return false; } })(), true],
+          ["counter advanced", after > before, true],
         ]);
         html += r.html; allOk = allOk && r.ok;
 

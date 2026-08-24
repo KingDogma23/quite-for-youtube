@@ -9,19 +9,20 @@ A Chrome extension that removes ads from YouTube.
 | **Player overlays** | Banners drawn on top of the video |
 | **Merch shelves** | Product shelves under videos (optional, off by default) |
 
-**This is not a full ad blocker, and does not try to be.** It never touches a
-network request and never modifies YouTube's responses. Ads load; they are
-skipped, fast-forwarded, or hidden. Everything returns the moment you switch it
-off.
+YouTube's responses are never modified. The ad schedule is stopped at source
+instead: the request the player sends is declared as an ad unit rather than a
+watch page, and YouTube answers without an ad schedule of its own. Nothing is
+deleted and nothing is faked, so there is no mismatch between what the server
+sent and what the player sees — which is what YouTube's anti-adblock check
+looks for.
 
-Earlier versions did strip the ad schedule out of the player's responses.
-That works, and YouTube detects it: the result is a wall that blocks playback
-until the extension is disabled, and the flag persists for minutes after the
-cause is removed. Trying to undo that block client-side produces a video that
-will not play at all, because YouTube simply stops serving usable stream data
-to a flagged session. That whole approach has been removed rather than left in
-as a tempting switch. If you want ads blocked at the network layer, use a
-maintained ad blocker — that is a continuously updated product, not a setting.
+Earlier versions edited the response, and both ways of doing that failed
+usefully. Deleting the ad schedule gets the session flagged, and the flag is
+sticky for minutes, which makes any quick test unreadable. Rewriting the block
+itself produces a video that will not play at all, because a flagged session is
+simply not served usable stream data — the decision is made server-side and
+there is nothing on this end to repair. Everything returns the moment you switch
+it off.
 
 ## Install
 

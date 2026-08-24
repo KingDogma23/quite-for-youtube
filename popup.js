@@ -1,4 +1,5 @@
 const DEFAULTS = {
+  stripAdSchedule: true,
   enabled: true,
   skipVideoAds: true,
   hideFeedAds: true,
@@ -65,6 +66,7 @@ function render(d) {
     `all time: ${lt.adsBlocked} ads stopped, ${humanTime(lt.secondsSaved)} saved, ` +
       `${lt.adsSkipped || 0} ads skipped`,
     `on: ${Object.entries(d.settings).filter(([, v]) => v).map(([k]) => k).join(", ") || "nothing"}`,
+    `player requests rewritten: ${d.rewrites ?? 0}   (0 means ads are NOT being stopped at source)`,
     `video ads reaching playback: ${reached} ` +
       `(${s.videoAdsSkipped} skipped, ${s.spedUp ?? 0} sped up, ${s.videoAdsSeeked} seeked)`,
     `false seeks reverted: ${s.falseSeeksReverted ?? 0}   (should always be 0)`,
