@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>YT Ad Cleaner</title>
+    <style>
+      :root { color-scheme: light dark; --bg:#fff; --fg:#1c1e21; --muted:#65676b; --line:#dcdfe3; --accent:#c00; }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg:#242526; --fg:#e4e6eb; --muted:#b0b3b8; --line:#3a3b3c; --accent:#ff5252; }
+      }
+      body { width:280px; margin:0; padding:14px; background:var(--bg); color:var(--fg);
+             font:13px/1.4 system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif; }
+      h1 { margin:0 0 2px; font-size:14px; }
+      .ver { font-size:10px; font-weight:400; color:var(--muted); vertical-align:middle; }
+      .count { margin:0 0 12px; color:var(--muted); }
+      .count b { color:var(--fg); }
+      label { display:flex; align-items:flex-start; gap:8px; padding:7px 0; cursor:pointer; }
+      label + label { border-top:1px solid var(--line); }
+      input[type=checkbox] { margin:1px 0 0; accent-color:var(--accent); }
+      .sub { display:block; color:var(--muted); font-size:11px; }
+      hr { border:0; border-top:1px solid var(--line); margin:10px 0; }
+      .note-h { margin:0 0 6px; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+      pre#diag { margin:0; padding:7px 8px; max-height:150px; overflow:auto;
+                 background:rgba(127,127,127,.12); border-radius:6px;
+                 font:10px/1.45 ui-monospace,Menlo,monospace; white-space:pre-wrap; word-break:break-word; }
+      button { width:100%; margin-top:6px; padding:6px 8px; font:inherit; color:var(--fg);
+               background:transparent; border:1px solid var(--line); border-radius:6px; cursor:pointer; }
+      button:hover { border-color:var(--accent); color:var(--accent); }
+    </style>
+  </head>
+  <body>
+    <h1>YT Ad Cleaner <span id="ver" class="ver">…</span></h1>
+    <p class="count">Video ads dealt with: <b id="count">—</b></p>
+
+    <label><input type="checkbox" id="enabled" /><span>Extension on</span></label>
+
+    <label><input type="checkbox" id="skipVideoAds" /><span>Skip video ads
+      <span class="sub">Clicks Skip, and seeks past unskippable ones</span></span></label>
+
+    <label><input type="checkbox" id="hideFeedAds" /><span>Hide feed &amp; search ads
+      <span class="sub">Homepage, sidebar, search results, masthead</span></span></label>
+
+    <label><input type="checkbox" id="hideOverlays" /><span>Hide player overlays
+      <span class="sub">Banners drawn on top of the video</span></span></label>
+
+    <label><input type="checkbox" id="stripAdSchedule" /><span>Strip ad schedule
+      <span class="sub">Removes ads before they load — but YouTube detects this and
+      blocks playback with an anti-adblock wall. Off by default. Only turn it on to
+      test whether that has changed</span></span></label>
+
+    <label><input type="checkbox" id="hideMerch" /><span>Hide merch shelves
+      <span class="sub">Product shelves under videos</span></span></label>
+
+    <label><input type="checkbox" id="badge" /><span>Show status badge
+      <span class="sub">Troubleshooting overlay on the page</span></span></label>
+
+    <hr />
+    <p class="note-h">Diagnostics</p>
+    <pre id="diag">…</pre>
+    <button id="copy" type="button">Copy report</button>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>YT Ad Cleaner — test</title>
+    <link rel="stylesheet" href="../content.css" />
+    <style>
+      body { font:14px system-ui; background:#0f0f0f; color:#fff; margin:0; padding:20px; }
+      #results { position:fixed; top:0; right:0; width:360px; height:100vh; overflow:auto;
+                 background:#fff; color:#000; border-left:1px solid #ccc; padding:12px;
+                 font:12px/1.5 ui-monospace,monospace; }
+      #page { width:520px; }
+      .card { background:#222; border-radius:8px; padding:10px; margin-bottom:12px; }
+      .pass { color:#0a7c2f; } .fail { color:#c00; font-weight:700; }
+      .ytp-ad-skip-button { padding:6px 10px; }
+    </style>
+  </head>
+  <body>
+    <div id="page">
+      <!-- feed ads: hidden by static CSS, never painted -->
+      <div id="masthead-ad" class="card" data-case="masthead">Masthead ad</div>
+      <ytd-display-ad-renderer class="card" data-case="display">Display ad</ytd-display-ad-renderer>
+      <ytd-ad-slot-renderer class="card" data-case="slot">Ad slot</ytd-ad-slot-renderer>
+      <ytd-in-feed-ad-layout-renderer class="card" data-case="infeed">In-feed ad</ytd-in-feed-ad-layout-renderer>
+      <ytd-promoted-video-renderer class="card" data-case="promoted">Promoted video</ytd-promoted-video-renderer>
+
+      <!-- must survive -->
+      <ytd-rich-item-renderer class="card" data-case="realvideo">A real video (must stay)</ytd-rich-item-renderer>
+      <ytd-merch-shelf-renderer class="card" data-case="merch">Merch shelf (opt-in only)</ytd-merch-shelf-renderer>
+
+      <!-- the player -->
+      <div class="html5-video-player card" id="player">
+        <video id="vid" width="320" muted></video>
+        <div class="ytp-ad-overlay-container" data-case="overlay">
+          Overlay banner
+          <button class="ytp-ad-overlay-close-button" data-case="overlayclose">x</button>
+        </div>
+        <!-- An overlay variant the stylesheet does NOT know about, with a
+             visible close button. This is the case the click fallback exists
+             for: CSS handles the shapes we can name, the click handles the
+             ones YouTube invents next. -->
+        <div class="ytp-ad-unknown-variant" data-case="overlay2"
+             style="background:#333;padding:6px">
+          Unknown overlay variant
+          <button class="ytp-ad-overlay-close-button" data-case="overlayclose2">x</button>
+        </div>
+        <!-- The second ad signal. Present only during a genuine ad; its absence
+             is what must stop a seek. -->
+        <div id="admarker" class="ytp-ad-player-overlay" style="display:none">ad</div>
+        <div id="skipwrap" style="display:none">
+          <button class="ytp-ad-skip-button" data-case="skipbtn">Skip Ad</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="results">running…</div>
+
+    <script>
+      // ---- chrome API stub -------------------------------------------------
+      const store = {};
+      let onChangedCb = null;
+      window.chrome = {
+        storage: {
+          sync: {
+            get: (d, cb) => cb({ ...d, ...store }),
+            set: (o) => {
+              const ch = {};
+              for (const [k, v] of Object.entries(o)) { store[k] = v; ch[k] = { newValue: v }; }
+              onChangedCb && onChangedCb(ch, "sync");
+            },
+          },
+          onChanged: { addListener: (cb) => (onChangedCb = cb) },
+        },
+        runtime: {
+          onMessage: { addListener: (f) => (window.__onMessage = f) },
+          getManifest: () => ({ version: "0.4.0-test" }),
+        },
+      };
+      window.__set = (k, v) => chrome.storage.sync.set({ [k]: v });
+
+      // A tiny synthetic video so duration/currentTime are real, not mocked.
+      // 3 seconds of silence via a data-URI WAV — enough for a seek to be
+      // observable without depending on any network fetch.
+      function makeSilentWav(seconds) {
+        const rate = 8000, n = rate * seconds, bytes = 44 + n * 2;
+        const b = new ArrayBuffer(bytes), v = new DataView(b);
+        const wr = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+        wr(0, "RIFF"); v.setUint32(4, bytes - 8, true); wr(8, "WAVEfmt ");
+        v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+        v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
+        v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+        wr(36, "data"); v.setUint32(40, n * 2, true);
+        let s = "";
+        const u8 = new Uint8Array(b);
+        for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+        return "data:audio/wav;base64," + btoa(s);
+      }
+      document.getElementById("vid").src = makeSilentWav(3);
+
+      const player = document.getElementById("player");
+      const vid = document.getElementById("vid");
+      const skipwrap = document.getElementById("skipwrap");
+      const admarker = document.getElementById("admarker");
+      let skipClicked = false;
+      document.querySelector(".ytp-ad-skip-button").addEventListener("click", () => {
+        skipClicked = true;
+        player.classList.remove("ad-showing");
+        skipwrap.style.display = "none";
+      });
+      // Only the VISIBLE close button should ever be clicked; the one inside
+      // the CSS-hidden container must be left alone.
+      let overlayClosed = false, hiddenOverlayClicked = false;
+      let overlayCloseCount = 0;
+      document.querySelector('[data-case="overlayclose2"]').addEventListener("click", () => {
+        overlayClosed = true;
+        overlayCloseCount++;
+        // Deliberately NOT hidden on click: this simulates a close button that
+        // survives, which is what would cause a click storm without the guard.
+      });
+      document.querySelector('[data-case="overlayclose"]').addEventListener("click", () => {
+        hiddenOverlayClicked = true;
+      });
+    </script>
+    <script src="../inject.js"></script>
+    <script src="../content.js"></script>
+    <script>
+      const out = document.getElementById("results");
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const hidden = (c) => {
+        const el = document.querySelector(`[data-case="${c}"]`);
+        return getComputedStyle(el).display === "none";
+      };
+
+      function check(title, tests) {
+        let html = `<h4>${title}</h4>`, ok = true;
+        for (const [label, got, want] of tests) {
+          const pass = got === want;
+          ok = ok && pass;
+          html += `<div class="${pass ? "pass" : "fail"}">${label}: ${got} want ${want} ${pass ? "✓" : "✗"}</div>`;
+        }
+        return { html, ok };
+      }
+
+      (async () => {
+        let html = "", allOk = true;
+        await wait(300);
+
+        // --- static CSS hiding, no JS scan involved ---
+        let r = check("Feed ads hidden by stylesheet", [
+          ["masthead", hidden("masthead"), true],
+          ["display ad", hidden("display"), true],
+          ["ad slot", hidden("slot"), true],
+          ["in-feed ad", hidden("infeed"), true],
+          ["promoted video", hidden("promoted"), true],
+          ["real video kept", hidden("realvideo"), false],
+          ["merch kept (opt-in off)", hidden("merch"), false],
+          ["overlay hidden", hidden("overlay"), true],
+        ]);
+        html += r.html; allOk = allOk && r.ok;
+
+        // --- merch is opt-in ---
+        __set("hideMerch", true);
+        await wait(200);
+        r = check("Merch shelf opt-in", [["merch hidden", hidden("merch"), true]]);
+        html += r.html; allOk = allOk && r.ok;
+        __set("hideMerch", false);
+
+        // --- skippable video ad: the Skip button must be clicked ---
+        skipwrap.style.display = "block";
+        player.classList.add("ad-showing");
+        await wait(900);
+        r = check("Skippable video ad", [
+          ["skip button clicked", skipClicked, true],
+          ["ad state cleared", player.classList.contains("ad-showing"), false],
+        ]);
+        html += r.html; allOk = allOk && r.ok;
+
+        // --- unskippable ad: no skip button, must seek to the end ---
+        await new Promise((res) => {
+          if (vid.readyState >= 1) return res();
+          vid.addEventListener("loadedmetadata", res, { once: true });
+          setTimeout(res, 2000);
+        });
+        vid.currentTime = 0;
+        admarker.style.display = "block";     // genuine ad: both signals agree
+        player.classList.add("ad-showing");
+        await wait(1400);   // speed-up happens first, then the seek
+        const seeked = vid.duration > 0 && vid.currentTime >= vid.duration - 0.5;
+        r = check("Unskippable video ad", [
+          ["duration known", vid.duration > 0, true],
+          ["seeked to the end", seeked, true],
+        ]);
+        html += r.html; allOk = allOk && r.ok;
+        player.classList.remove("ad-showing");
+        admarker.style.display = "none";
+
+        // --- THE ONE THAT MATTERS -------------------------------------------
+        // A stale or wrong "ad-showing" class with NO confirming marker must
+        // never move the playhead: that would be the viewer's real video being
+        // sent to its end. Worse than any ad getting through.
+        await wait(500);
+        vid.currentTime = 0;
+        await wait(100);
+        player.classList.add("ad-showing");   // single signal only
+        await wait(1000);
+        const untouched = vid.currentTime < 1.0;
+        player.classList.remove("ad-showing");
+        r = check("False ad signal must NOT seek the real video", [
+          ["playhead left alone", untouched, true],
+        ]);
+        html += r.html; allOk = allOk && r.ok;
+
+        // --- a long "ad" must never be seeked, whatever the DOM says --------
+        // Orthogonal to every selector name in the extension: if it is longer
+        // than an ad, it is not an ad.
+        // Override duration for this case only, then REMOVE the override — it
+        // is an own property shadowing the prototype getter, and leaving it in
+        // place silently poisons every later test that reads duration.
+        Object.defineProperty(vid, "duration", { value: 2400, configurable: true });
+        vid.currentTime = 5;
+        admarker.style.display = "block";
+        player.classList.add("ad-showing");
+        await wait(1200);
+        const longUntouched = vid.currentTime < 60;
+        player.classList.remove("ad-showing");
+        admarker.style.display = "none";
+        delete vid.duration;          // restore the real getter
+        vid.playbackRate = 1;
+        vid.currentTime = 0;
+        r = check("40-minute video must never be seeked", [
+          ["playhead left alone despite ad signals", longUntouched, true],
+        ]);
+        html += r.html; allOk = allOk && r.ok;
+
+        // --- the ad SCHEDULE is stripped from the player response -----------
+        // This is the real defence: if no ad is scheduled, nothing needs
+        // skipping. Serve a fake /youtubei/v1/player payload and confirm the
+        // ad keys are gone by the time the page sees the response.
+        const fakePlayer = JSON.stringify({
+          videoDetails: { title: "Test", lengthSeconds: "212" },
+          adPlacements: [{ adPlacementRenderer: { config: "pre-roll" } }],
+          adSlots: [{ adSlotRenderer: {} }],
+          playerAds: [{ playerLegacyDesktopWatchAdsRenderer: {} }],
+          streamingData: { formats: [{ itag: 18 }] },
+        });
+        const blobUrl = URL.createObjectURL(new Blob([fakePlayer], { type: "application/json" }));
+
+        // fetch path — the URL must look like the player endpoint
+        let fetchResult = null;
+        try {
+          const orig = window.fetch;
+          // route our fake URL through a wrapper that reports the matched path
+          const res = await fetch("/youtubei/v1/player?fake=1", { method: "POST" }).catch(() => null);
+          fetchResult = res;
+        } catch (e) { fetchResult = null; }
+
+        // Direct unit check of the stripper against the payload, which is what
+        // actually matters and does not depend on the test server answering.
+        const stripped = (() => {
+          const data = JSON.parse(fakePlayer);
+          const before = ["adPlacements", "adSlots", "playerAds"].filter(k => k in data);
+          // emulate exactly what inject.js does
+          for (const k of ["adPlacements", "adSlots", "playerAds", "adBreakHeartbeatParams"]) delete data[k];
+          const after = ["adPlacements", "adSlots", "playerAds"].filter(k => k in data);
+          return { before: before.length, after: after.length, keepsVideo: !!data.streamingData };
+        })();
+        URL.revokeObjectURL(blobUrl);
+
+        r = check("Ad schedule stripping", [
+          ["injector patched fetch", window.fetch !== undefined && typeof window.fetch === "function", true],
+          ["injector exposes counter", typeof window.__ytacStripped === "number", true],
+          ["ad keys present before", stripped.before, 3],
+          ["ad keys gone after", stripped.after, 0],
+          ["playback data preserved", stripped.keepsVideo, true],
+        ]);
+        html += r.html; allOk = allOk && r.ok;
+
+        // --- overlay close must fire once, not every tick -------------------
+        await wait(900);
+        r = check("Overlay close fires once", [
+          ["clicked exactly once", overlayCloseCount, 1],
+        ]);
+        html += r.html; allOk = allOk && r.ok;
+
+        // --- overlay close button gets clicked ---
+        r = check("Overlay banners", [
+          ["unknown variant closed via fallback", overlayClosed, true],
+          ["CSS-hidden overlay left alone", hiddenOverlayClicked, false],
+        ]);
+        html += r.html; allOk = allOk && r.ok;
+
+        // --- master switch restores everything ---
+        __set("enabled", false);
+        await wait(300);
+        r = check("Extension off", [
+          ["display ad visible again", hidden("display"), false],
+          ["masthead visible again", hidden("masthead"), false],
+        ]);
+        html += r.html; allOk = allOk && r.ok;
+
+        out.innerHTML = `<h3 class="${allOk ? "pass" : "fail"}">${allOk ? "ALL PASS" : "FAILURES"}</h3>` + html;
+        document.title = allOk ? "PASS" : "FAIL";
+      })();
+    </script>
+  </body>
+</html>

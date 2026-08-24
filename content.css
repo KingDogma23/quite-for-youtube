@@ -1,0 +1,99 @@
+/*
+ * Static hiding for YouTube's ad containers.
+ *
+ * Selectors are derived from the live EasyList and uBlock Origin filter lists
+ * rather than from memory. That check mattered: ytd-display-ad-renderer,
+ * ytd-promoted-video-renderer and ytd-in-feed-ad-layout-renderer appear ZERO
+ * times in current lists — they are legacy names. The modern one is
+ * ytd-ad-slot-renderer, and the lists hide its PARENT, not the element itself,
+ * because hiding only the inner node leaves an empty cell in the grid.
+ *
+ * Legacy names are kept as harmless backstops; an unmatched selector costs
+ * nothing, and old markup still appears on some surfaces.
+ *
+ * Rules are gated on :not([data-ytac-feed-off]) so hiding is the DEFAULT and
+ * applies before any script runs. Turning the option off sets that attribute.
+ */
+
+/* --- the container, so no empty gap is left behind (EasyList's approach) --- */
+html:not([data-ytac-feed-off]) ytd-rich-item-renderer:has(> #content > ytd-ad-slot-renderer),
+html:not([data-ytac-feed-off]) #contents > ytd-rich-item-renderer:has(> ytd-ad-slot-renderer),
+html:not([data-ytac-feed-off]) ytd-rich-section-renderer:has(ytd-ad-slot-renderer),
+html:not([data-ytac-feed-off]) ytd-item-section-renderer:has(> #contents > ytd-ad-slot-renderer),
+html:not([data-ytac-feed-off]) #shorts-inner-container > .ytd-shorts:has(> .ytd-reel-video-renderer > ytd-ad-slot-renderer),
+
+/* --- watch-page sidebar and companion slots, parent included so the
+       surrounding item does not leave a gap --- */
+html:not([data-ytac-feed-off]) ytd-watch-next-secondary-results-renderer ytd-ad-slot-renderer,
+html:not([data-ytac-feed-off]) #related ytd-ad-slot-renderer,
+html:not([data-ytac-feed-off]) #panels ytd-ad-slot-renderer,
+html:not([data-ytac-feed-off]) ytd-engagement-panel-section-list-renderer:has(ytd-ad-slot-renderer),
+html:not([data-ytac-feed-off]) ytd-compact-video-renderer:has(ytd-ad-slot-renderer),
+
+/* --- the ad element itself, as a backstop --- */
+html:not([data-ytac-feed-off]) ytd-ad-slot-renderer,
+html:not([data-ytac-feed-off]) ad-slot-renderer,
+html:not([data-ytac-feed-off]) ytm-companion-slot[data-content-type] > ytm-companion-ad-renderer,
+html:not([data-ytac-feed-off]) ytd-search-pyv-renderer,
+
+/* --- confirmed present in current lists --- */
+html:not([data-ytac-feed-off]) #masthead-ad,
+html:not([data-ytac-feed-off]) #player-ads,
+html:not([data-ytac-feed-off]) #shopping-timely-shelf,
+html:not([data-ytac-feed-off]) #sticker-layer,
+html:not([data-ytac-feed-off]) yt-overlay-product-sticker,
+html:not([data-ytac-feed-off]) .ytp-suggested-action,
+html:not([data-ytac-feed-off]) .ytp-featured-product,
+
+/* --- legacy names, harmless if unmatched --- */
+html:not([data-ytac-feed-off]) ytd-display-ad-renderer,
+html:not([data-ytac-feed-off]) ytd-promoted-sparkles-web-renderer,
+html:not([data-ytac-feed-off]) ytd-promoted-sparkles-text-search-renderer,
+html:not([data-ytac-feed-off]) ytd-promoted-video-renderer,
+html:not([data-ytac-feed-off]) ytd-in-feed-ad-layout-renderer,
+html:not([data-ytac-feed-off]) ytd-banner-promo-renderer,
+html:not([data-ytac-feed-off]) ytd-statement-banner-renderer,
+html:not([data-ytac-feed-off]) ytd-video-masthead-ad-v3-renderer,
+html:not([data-ytac-feed-off]) ytd-primetime-promo-renderer,
+html:not([data-ytac-feed-off]) ytd-companion-slot-renderer,
+html:not([data-ytac-feed-off]) ytd-action-companion-ad-renderer,
+html:not([data-ytac-feed-off]) ytm-promoted-video-renderer,
+
+html:not([data-ytac-feed-off]) [data-ytac-hidden="1"] {
+  display: none !important;
+}
+
+/* Overlay banners drawn on top of the video. */
+html:not([data-ytac-overlay-off]) .ytp-ad-overlay-container,
+html:not([data-ytac-overlay-off]) .ytp-ad-overlay-slot,
+html:not([data-ytac-overlay-off]) .ytp-ad-text-overlay,
+html:not([data-ytac-overlay-off]) .ytp-ad-overlay-image {
+  display: none !important;
+}
+
+/* Merch and product shelves — opt-in, since some people want them. */
+html[data-ytac-merch-off] ytd-merch-shelf-renderer,
+html[data-ytac-merch-off] #description-inner > ytd-merch-shelf-renderer,
+html[data-ytac-merch-off] .ytd-watch-flexy > ytd-merch-shelf-renderer {
+  display: none !important;
+}
+
+/* Status badge. */
+#ytac-badge {
+  position: fixed !important;
+  left: 12px;
+  bottom: 12px;
+  z-index: 2147483647;
+  max-width: 380px;
+  padding: 7px 11px;
+  border-radius: 8px;
+  font: 500 12px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  color: #fff;
+  background: #c00;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+#ytac-badge[data-state="ok"] {
+  background: #0f7b3f;
+}
