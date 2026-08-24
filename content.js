@@ -509,6 +509,9 @@
         rewrites: Number(
           document.documentElement.getAttribute("data-ytac-rewrites") || 0
         ),
+        strategy:
+          document.documentElement.getAttribute("data-ytac-strategy") || "none yet",
+        walled: /Ad blockers violate/i.test(document.body?.innerText || ""),
         page: {
           playerFound: !!player(),
           adPlayingNow: adIsPlaying(),

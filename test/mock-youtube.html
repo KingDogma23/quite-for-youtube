@@ -240,28 +240,42 @@
         ]);
         html += r.html; allOk = allOk && r.ok;
 
-        // --- the OUTGOING player request is rewritten ----------------------
-        // Exercises the real injector. The request is what gets changed; the
-        // response is never touched, which is the whole point — editing the
-        // response is what earlier versions did, and what YouTube detects.
-        const before = Number(document.documentElement.getAttribute("data-ytac-rewrites") || 0);
-        const watchReq = JSON.stringify({
-          context: { client: { clientName: "WEB", clientScreen: "WATCH" } },
-          videoId: "abc123",
+        // --- the OUTGOING player request is shaped -------------------------
+        // Exercises the real injector. Only the REQUEST changes; responses are
+        // read and handed back untouched. Editing responses is what earlier
+        // versions did, and what YouTube detects.
+        const mkReq = (extra = {}) => ({
+          context: {
+            client: {
+              clientName: "WEB",
+              clientScreen: "WATCH",
+              configInfo: { appInstallData: "FINGERPRINT" },
+            },
+          },
+          videoId: "vid_one",
+          contentPlaybackContext: { lactMilliseconds: "0" },
+          ...extra,
         });
-        const shareReq = JSON.stringify({
-          context: { client: { clientName: "WEB", isWebNativeShareAvailable: true } },
-        });
-        const unrelated = JSON.stringify({ hello: "world", clientScreen: "SOMETHING_ELSE" });
-        const after = Number(document.documentElement.getAttribute("data-ytac-rewrites") || 0);
 
-        r = check("Outbound request rewrite", [
-          ["watch request declared as ad unit", watchReq.includes('"clientScreen":"ADUNIT"'), true],
-          ["no WATCH screen left in it", watchReq.includes('"clientScreen":"WATCH"'), false],
-          ["share-shaped request also rewritten", shareReq.includes('"clientScreen":"ADUNIT"'), true],
-          ["unrelated JSON untouched", unrelated, '{"hello":"world","clientScreen":"SOMETHING_ELSE"}'],
-          ["still valid JSON", (() => { try { JSON.parse(watchReq); return true; } catch { return false; } })(), true],
-          ["counter advanced", after > before, true],
+        const req1 = mkReq();
+        JSON.stringify(req1);
+        const firstStrategy = document.documentElement.getAttribute("data-ytac-strategy");
+
+        // A request already carrying a protected params value is left alone.
+        const guarded = mkReq({ params: "YAHIAQE" });
+        JSON.stringify(guarded);
+
+        // Anything that is not a player request must pass through untouched.
+        const plainOut = JSON.stringify({ hello: "world" });
+
+        r = check("Outbound request shaping", [
+          ["params set on the request", req1.params, "eAFgAQ"],
+          ["starts on the first strategy", firstStrategy, "params_a"],
+          ["install fingerprint removed", !!req1.context.client.configInfo.appInstallData, false],
+          ["lactMilliseconds refreshed", req1.contentPlaybackContext.lactMilliseconds !== "0", true],
+          ["protected params left alone", guarded.params, "YAHIAQE"],
+          ["unrelated object untouched", plainOut, '{"hello":"world"}'],
+          ["shape counter advanced", Number(document.documentElement.getAttribute("data-ytac-rewrites")) > 0, true],
         ]);
         html += r.html; allOk = allOk && r.ok;
 
