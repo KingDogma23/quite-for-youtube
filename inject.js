@@ -269,6 +269,11 @@
 
     recovered.add(id);
     try {
+      mutedBeforeRecovery = player.isMuted ? player.isMuted() : null;
+    } catch {
+      mutedBeforeRecovery = null;
+    }
+    try {
       player.loadVideoById(id);
     } catch {
       return;
@@ -290,6 +295,7 @@
         } catch {
           /* the user can press play */
         }
+        undoForcedMute();
         try {
           document.documentElement.setAttribute("data-ytac-recovered", "1");
         } catch {
@@ -300,10 +306,72 @@
     }
   }
 
+  // ---- undo the mute our own shaping provokes ------------------------------
+  //
+  // Shaping the request makes YouTube treat the load as a preview-ish context,
+  // and it answers with playerConfig.audioConfig.muteOnStart = true — so the
+  // video plays silently. Measured on a live load: muteOnStart true on a
+  // response that was otherwise perfect.
+  //
+  // The response is NOT edited to fix this. It is undone through the player's
+  // own unMute(), and only when YouTube asked for the mute in the first place,
+  // so a mute the viewer chose is never overridden.
+  const unmuted = new Set();
+
+  // Set just before a recovery reload, so sound can be put back exactly as the
+  // viewer had it. Null means "we have not intervened on this video".
+  let mutedBeforeRecovery = null;
+
+  function undoForcedMute() {
+    if (off()) return;
+    const id = videoIdNow();
+    if (!id || unmuted.has(id)) return;
+    const player = document.getElementById("movie_player");
+    if (!player || typeof player.isMuted !== "function") return;
+
+    let response;
+    try {
+      response = player.getPlayerResponse && player.getPlayerResponse();
+    } catch {
+      return;
+    }
+    const audio = response && response.playerConfig && response.playerConfig.audioConfig;
+
+    // Two ways our own behaviour can silence a video, and they are not
+    // distinguishable after the fact:
+    //   - YouTube answers a shaped request with muteOnStart, or
+    //   - the browser's autoplay policy mutes the programmatic playVideo()
+    //     that recovery performs, since there was no gesture behind it.
+    // Either way the test is the same: sound was on before we touched it, and
+    // is off now. A mute the viewer chose is never overridden, and YouTube
+    // persists whatever state it ends in to yt-player-volume — which is why a
+    // single silenced load otherwise makes every later video silent too.
+    const youtubeAskedForIt = !!(audio && audio.muteOnStart === true);
+    const weSilencedIt = mutedBeforeRecovery === false;
+    if (!youtubeAskedForIt && !weSilencedIt) return;
+
+    try {
+      if (player.isMuted()) {
+        player.unMute();
+        // unMute() restores the previous level, but a zeroed volume would
+        // leave it silent anyway.
+        if (typeof player.getVolume === "function" && player.getVolume() === 0) {
+          player.setVolume(100);
+        }
+      }
+      unmuted.add(id);
+      document.documentElement.setAttribute("data-ytac-unmuted", "1");
+    } catch {
+      /* the viewer can always unmute by hand */
+    }
+  }
+
   function watchForWall() {
     // The wall can be there on arrival, or appear a moment later, and YouTube
-    // navigates in-page without reloading.
+    // navigates in-page without reloading. The forced mute is checked on the
+    // same schedule: it applies to any shaped load, not only a recovered one.
     [1500, 3000, 5000, 8000].forEach((ms) => setTimeout(recover, ms));
+    [800, 1600, 2600, 4000, 6000, 9000].forEach((ms) => setTimeout(undoForcedMute, ms));
   }
 
   if (document.readyState === "loading") {

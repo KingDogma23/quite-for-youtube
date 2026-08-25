@@ -279,6 +279,58 @@
         ]);
         html += r.html; allOk = allOk && r.ok;
 
+        // --- a shaped load must not leave the video silent ------------------
+        // Shaping the request makes YouTube answer with muteOnStart, and
+        // YouTube persists whatever mute state a load ends in — so one
+        // silenced video makes every later one silent too. Reported from real
+        // use, reproduced here against the real injector.
+        {
+          history.replaceState(null, "", location.pathname + "?v=mute_test");
+          let unMuteCalls = 0;
+          let muted = true;
+          const fake = document.createElement("div");
+          fake.id = "movie_player";
+          fake.isMuted = () => muted;
+          fake.unMute = () => { muted = false; unMuteCalls++; };
+          fake.getVolume = () => 95;
+          fake.setVolume = () => {};
+          fake.playVideo = () => {};
+          fake.loadVideoById = () => {};
+          fake.getPlayerResponse = () => ({
+            playabilityStatus: { status: "OK" },
+            playerConfig: { audioConfig: { muteOnStart: true } },
+          });
+          document.body.appendChild(fake);
+
+          window.dispatchEvent(new Event("yt-navigate-finish"));
+          await wait(2000);
+          const restored = !muted;
+
+          // A mute the VIEWER chose must survive: no muteOnStart, no rescue.
+          history.replaceState(null, "", location.pathname + "?v=viewer_muted");
+          muted = true;
+          let viewerUnMutes = 0;
+          fake.unMute = () => { muted = false; viewerUnMutes++; };
+          fake.getPlayerResponse = () => ({
+            playabilityStatus: { status: "OK" },
+            playerConfig: { audioConfig: {} },
+          });
+          window.dispatchEvent(new Event("yt-navigate-finish"));
+          await wait(2000);
+          const viewerMuteRespected = muted;
+
+          fake.remove();
+          history.replaceState(null, "", location.pathname);
+
+          r = check("Forced mute is undone", [
+            ["sound restored after a shaped load", restored, true],
+            ["unMute called exactly once", unMuteCalls, 1],
+            ["a mute the viewer chose is left alone", viewerMuteRespected, true],
+            ["and never overridden", viewerUnMutes, 0],
+          ]);
+          html += r.html; allOk = allOk && r.ok;
+        }
+
         // --- overlay close must fire once, not every tick -------------------
         await wait(900);
         r = check("Overlay close fires once", [
