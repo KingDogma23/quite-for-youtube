@@ -1,66 +1,54 @@
 /**
- * Quiet for YouTube — outbound player-request shaping.
+ * Quiet for YouTube — page-world ad neutralisation.
  *
- * THE RULE THIS FILE EXISTS TO OBEY: never modify a response.
+ * This follows the approach every maintained blocker actually uses, read out
+ * of uBlock Origin's live YouTube rules and confirmed in the two highest-rated
+ * Chrome Web Store blockers, both of which ship those same rules:
  *
- * Two earlier approaches edited what YouTube sent back — deleting the ad
- * schedule, then rewriting playabilityStatus to undo the anti-adblock block.
- * Both failed, and the failures were diagnostic:
+ *   set-constant  ytInitialPlayerResponse.adPlacements  undefined
+ *   set-constant  ytInitialPlayerResponse.adSlots       undefined
+ *   set-constant  ytInitialPlayerResponse.playerAds     undefined
+ *   set-constant  playerResponse.adPlacements           undefined
+ *   set-constant  google_ad_status                      1
+ *   json-prune    playerResponse.adPlacements … guarded on
+ *                 playerResponse.streamingData.serverAbrStreamingUrl
  *
- *   - Deleting ads from the response leaves a mismatch between what the server
- *     sent and what the player sees. That mismatch is what the integrity check
- *     looks for, and it gets the session flagged.
- *   - Rewriting the block produces a video that will not play at all: a
- *     flagged session is not served usable stream data. The decision is made
- *     server-side and there is nothing on this end to repair.
+ * Three corrections to what this file used to do:
  *
- * So the request is shaped instead, and the response is only ever READ.
+ * 1. The COLD LOAD is handled. YouTube embeds the player response in the page,
+ *    so there is no request to intercept — measured live, 9 ad placements and
+ *    6 ad slots sitting in that embedded object. An earlier version concluded
+ *    this was unreachable and gave up on it. It is reached by intercepting the
+ *    assignment and neutralising the fields as they arrive.
  *
- * These are InnerTube request parameters — the same public API surface every
- * YouTube client uses. Several shapes return a response with no ad schedule of
- * its own; which one works varies by account and changes over time, so they
- * are tried in order and the next is used when a response comes back
- * unplayable. No code was copied from any other extension.
+ * 2. Ad fields are set to undefined, not deleted, and network responses have
+ *    the key RENAMED rather than cut out. Crude deletion is what got sessions
+ *    flagged; the structure is left intact here.
  *
- * Every path is wrapped: any failure leaves the request exactly as the page
- * built it, because a broken YouTube is far worse than an ad.
+ * 3. Requests are no longer shaped. Declaring the load as a preview context is
+ *    not what the maintained blockers do, and it is what made YouTube answer
+ *    with muteOnStart — the cause of videos playing silently.
+ *
+ * Every path is wrapped: any failure leaves the data exactly as it arrived,
+ * because a broken YouTube is far worse than an ad.
  */
 
 (() => {
   "use strict";
 
-  const PARAMS_A = "eAFgAQ";
-  const PARAMS_B = "8AUB";
-  const PARAMS_KEEP = "YAHI"; // a request already carrying this is left alone
-  const SCREEN = "CHANNEL";
+  const AD_KEYS = ["adPlacements", "adSlots", "playerAds", "adBreakHeartbeatParams"];
 
-  // Tried in order. Each shapes the outgoing player request differently; the
-  // rotation moves on when YouTube answers with something unplayable.
-  const STRATEGIES = ["params_a", "params_b", "client_screen", "pyv", "ad_type", "none"];
-  let strategyIndex = 0;
-  let lastVideoId = null;
-  let shaped = 0;
+  // A player response always carries one of these. Requiring one means this
+  // can only ever act on a real player payload, never on something that merely
+  // happens to contain a similar key.
+  const isPlayerPayload = (o) =>
+    !!o &&
+    typeof o === "object" &&
+    (!!o.playabilityStatus ||
+      !!(o.streamingData && o.streamingData.serverAbrStreamingUrl));
 
-  const strategy = () => STRATEGIES[strategyIndex];
+  let neutralised = 0;
 
-  function publish() {
-    try {
-      const root = document.documentElement;
-      root.setAttribute("data-ytac-rewrites", String(shaped));
-      root.setAttribute("data-ytac-strategy", strategy());
-    } catch {
-      /* reporting must never break a request */
-    }
-  }
-
-  function nextStrategy() {
-    if (strategyIndex < STRATEGIES.length - 1) {
-      strategyIndex++;
-      publish();
-    }
-  }
-
-  /** Off switch, read from the DOM: chrome.storage is unreachable from here. */
   function off() {
     try {
       const root = document.documentElement;
@@ -72,151 +60,201 @@
     }
   }
 
-  // A backgrounded tab gets different treatment from the player; keep it
-  // reporting as visible so behaviour is consistent.
+  function publish() {
+    try {
+      document.documentElement.setAttribute("data-ytac-rewrites", String(neutralised));
+    } catch {
+      /* reporting must never break playback */
+    }
+  }
+
+  /**
+   * Make the ad fields of one player response read as undefined.
+   *
+   * The keys stay present as accessors rather than being deleted, and writes
+   * to them are swallowed so a later assignment cannot put the schedule back.
+   */
+  function neutralise(payload) {
+    if (off() || !isPlayerPayload(payload)) return false;
+    let hit = false;
+    for (const key of AD_KEYS) {
+      if (!(key in payload)) continue;
+      try {
+        const had = payload[key];
+        if (had === undefined) continue;
+        Object.defineProperty(payload, key, {
+          configurable: true,
+          enumerable: true,
+          get: () => undefined,
+          set: () => {},
+        });
+        hit = true;
+      } catch {
+        /* a locked property is left alone */
+      }
+    }
+    if (hit) {
+      neutralised++;
+      publish();
+    }
+    return hit;
+  }
+
+  /**
+   * Watch a global for a player response being assigned to it. This is what
+   * catches the cold load, where the response is embedded in the page's own
+   * HTML and never fetched.
+   */
+  function guardGlobal(name) {
+    let held;
+    try {
+      held = window[name];
+      if (held) neutralise(held);
+    } catch {
+      /* ignore */
+    }
+    try {
+      Object.defineProperty(window, name, {
+        configurable: true,
+        get: () => held,
+        set: (value) => {
+          try {
+            neutralise(value);
+          } catch {
+            /* never block the assignment */
+          }
+          held = value;
+        },
+      });
+    } catch {
+      /* if it cannot be redefined, the response paths below still apply */
+    }
+  }
+
+  guardGlobal("ytInitialPlayerResponse");
+  guardGlobal("playerResponse");
+
+  // Detection scripts read this to decide whether ads loaded. Reporting the
+  // healthy value keeps that check quiet without touching any ad data.
   try {
-    Object.defineProperty(document, "visibilityState", {
-      get: () => "visible",
+    Object.defineProperty(window, "google_ad_status", {
       configurable: true,
+      get: () => 1,
+      set: () => {},
     });
   } catch {
-    /* not essential */
+    /* optional */
   }
 
-  function setParams(req, value) {
-    if (req.params !== value) req.params = value;
-    if (req.playerRequest && req.playerRequest.params !== value) {
-      req.playerRequest.params = value;
-    }
-    if (req.playbackContext && req.playbackContext.params !== value) {
-      req.playbackContext.params = value;
-    }
-  }
+  // ---- responses fetched later (in-page navigation) ------------------------
+  // Renamed, not cut out, so the shape of the payload is unchanged.
+  const PLAYER_URL = /\/youtubei\/v1\/(player|get_watch|reel_item_watch)/;
+  const REEL_URL = /\/youtubei\/v1\/reel_watch_sequence/;
 
-  /** Shape one outgoing player request according to the current strategy. */
-  function shape(req) {
-    const client = req.context && req.context.client;
-    if (!client) return false;
+  function rewriteBody(text, url) {
+    if (off() || typeof text !== "string" || text.length < 2) return null;
 
-    // A new video restarts the rotation: a shape that failed on one video is
-    // not evidence about the next.
-    const id = req.videoId;
-    if (id && lastVideoId && id !== lastVideoId) strategyIndex = 0;
-    if (id) lastVideoId = id;
-
-    // Already carrying a params value we must not disturb.
-    if (typeof req.params === "string" && req.params.startsWith(PARAMS_KEEP)) return false;
-
-    const playback = req.contentPlaybackContext || (req.playbackContext &&
-      req.playbackContext.contentPlaybackContext);
-
-    switch (strategy()) {
-      case "params_a":
-        setParams(req, PARAMS_A);
-        break;
-      case "params_b":
-        setParams(req, PARAMS_B);
-        if (!req.playlistId) client.clientScreen = SCREEN;
-        break;
-      case "client_screen":
-        if (client.clientName !== "WEB") return false;
-        client.clientScreen = SCREEN;
-        break;
-      case "pyv":
-        req.adPlaybackContext = { pyv: true };
-        break;
-      case "ad_type":
-        req.adPlaybackContext = { adType: "AD_TYPE_INSTREAM" };
-        break;
-      default:
-        return false; // "none": hand it over untouched
+    if (REEL_URL.test(url)) {
+      // Shorts carry their ad marker as a flag rather than a schedule.
+      if (!text.includes('"isAd":true')) return null;
+      neutralised++;
+      publish();
+      return text.split('"isAd":true').join('"isAd":false');
     }
 
-    // Housekeeping the player itself does, kept consistent with the shaping.
-    if (playback) playback.lactMilliseconds = String(Date.now());
-    if (client.configInfo && client.configInfo.appInstallData) {
-      delete client.configInfo.appInstallData;
+    // Guard: only a real player payload, matching how the maintained rules
+    // qualify this before touching anything.
+    if (!text.includes("serverAbrStreamingUrl") && !text.includes('"playabilityStatus"')) {
+      return null;
     }
-
-    shaped++;
+    let out = text;
+    let hit = false;
+    for (const key of AD_KEYS) {
+      const needle = `"${key}"`;
+      if (!out.includes(needle)) continue;
+      out = out.split(needle).join(`"no_ads_${key}"`);
+      hit = true;
+    }
+    if (!hit) return null;
+    neutralised++;
     publish();
-    return true;
+    return out;
   }
 
-  const looksLikePlayerRequest = (v) =>
-    v && typeof v === "object" && v.context && v.context.client &&
-    (v.videoId || v.playbackContext || v.playerRequest);
-
-  // ---- shape the request on its way out ------------------------------------
-  const nativeStringify = JSON.stringify;
-  JSON.stringify = function (value, ...rest) {
-    try {
-      if (!off() && looksLikePlayerRequest(value)) shape(value);
-    } catch {
-      /* leave the request exactly as the page built it */
-    }
-    return nativeStringify.call(this, value, ...rest);
-  };
-  try {
-    Object.defineProperty(JSON.stringify, "name", { value: "stringify" });
-    JSON.stringify.toString = () => nativeStringify.toString();
-  } catch {
-    /* cosmetic */
-  }
-
-  // ---- READ the response, only to decide whether to rotate -----------------
-  // Nothing here modifies anything. Reading is safe; editing is what gets a
-  // session flagged.
-  const UNPLAYABLE = /"status"\s*:\s*"(ERROR|UNPLAYABLE|LOGIN_REQUIRED)"/;
-  const PLAYER_URL = /\/youtubei\/v1\/player/;
-
-  function noteResponseText(text) {
-    try {
-      if (typeof text !== "string" || !UNPLAYABLE.test(text)) return;
-      if (text.includes("CONTENT_CHECK_REQUIRED")) return; // a real gate
-      nextStrategy();
-    } catch {
-      /* never interfere with the response */
-    }
-  }
+  const urlOf = (input) =>
+    typeof input === "string" ? input : (input && (input.url || String(input))) || "";
 
   const nativeFetch = window.fetch;
   if (typeof nativeFetch === "function") {
     window.fetch = function (...args) {
       const res = nativeFetch.apply(this, args);
-      const url =
-        typeof args[0] === "string" ? args[0] : (args[0] && args[0].url) || "";
-      if (!PLAYER_URL.test(url)) return res;
+      const url = urlOf(args[0]);
+      if (!PLAYER_URL.test(url) && !REEL_URL.test(url)) return res;
       return res.then((response) => {
         try {
-          response.clone().text().then(noteResponseText).catch(() => {});
+          return response
+            .clone()
+            .text()
+            .then((text) => {
+              const cleaned = rewriteBody(text, url);
+              if (cleaned === null) return response;
+              return new Response(cleaned, {
+                status: response.status,
+                statusText: response.statusText,
+                headers: response.headers,
+              });
+            })
+            .catch(() => response);
         } catch {
-          /* ignore */
+          return response;
         }
-        return response; // handed back untouched
       });
     };
   }
 
-  // ---- recovery from an already-flagged session ---------------------------
+  const OpenOrig = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+    const u = String(url || "");
+    this.__ytacUrl = PLAYER_URL.test(u) || REEL_URL.test(u) ? u : null;
+    return OpenOrig.call(this, method, url, ...rest);
+  };
+
+  const SendOrig = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.send = function (...args) {
+    if (this.__ytacUrl) {
+      this.addEventListener("readystatechange", function () {
+        if (this.readyState !== 4) return;
+        try {
+          const raw =
+            this.responseType === "" || this.responseType === "text" ? this.responseText : null;
+          const cleaned = rewriteBody(raw, this.__ytacUrl);
+          if (cleaned === null) return;
+          Object.defineProperty(this, "responseText", { value: cleaned, configurable: true });
+          Object.defineProperty(this, "response", { value: cleaned, configurable: true });
+        } catch {
+          /* leave the response exactly as it came */
+        }
+      });
+    }
+    return SendOrig.apply(this, args);
+  };
+
+  // ---- recovery from a session that is already flagged --------------------
   //
-  // Everything above can only PREVENT a session being flagged. This is what
-  // gets a flagged one back, and it is the piece that was missing all along.
+  // Kept as a safety net. Nothing above should provoke the anti-adblock wall,
+  // but a session flagged earlier stays flagged for a while, and the block
+  // arrives embedded in the page before any of this can act. Forcing a real
+  // player request through loadVideoById gets a clean response, and the wall
+  // left on screen at that point is stale markup from the failed load.
   //
-  // On a cold page load YouTube embeds the player response in the HTML, so
-  // there is no request to shape and the wall arrives before any of this can
-  // speak. But the player object exposes loadVideoById, and calling it forces
-  // a REAL player request — which does get shaped, and comes back OK with no
-  // ad schedule. The wall left on screen at that point is stale UI from the
-  // failed load, so it is cleared directly.
-  //
-  // Verified live on a walled session: status ERROR with the wall showing,
-  // then after this sequence status OK, adPlacements absent, wall gone and
-  // the video playing.
+  // Verified live: status ERROR with the wall showing, then after this
+  // sequence status OK, no ad schedule, wall gone, video playing.
 
   const WALL_WORDS = /ad ?block|allow ?list|allowlist|ads (allow|help)|violate/i;
   const recovered = new Set();
+  const unmuted = new Set();
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let mutedBeforeRecovery = null;
 
   const videoIdNow = () => {
     try {
@@ -226,16 +264,13 @@
     }
   };
 
-  /** Is the page blocked specifically for ad blocking? */
   function wallShowing() {
     try {
       const player = document.getElementById("movie_player");
-      const status = player && player.getPlayerResponse && player.getPlayerResponse();
-      const ps = status && status.playabilityStatus;
-      if (ps && ps.status && ps.status !== "OK") {
-        // Only ad-blocker enforcement. Private, age-gated, geo-blocked and
-        // removed videos are none of our business and stay as they are.
-        if (WALL_WORDS.test(JSON.stringify(ps))) return true;
+      const response = player && player.getPlayerResponse && player.getPlayerResponse();
+      const ps = response && response.playabilityStatus;
+      if (ps && ps.status && ps.status !== "OK" && WALL_WORDS.test(JSON.stringify(ps))) {
+        return true;
       }
       const flexy = document.querySelector("ytd-watch-flexy");
       if (flexy && flexy.hasAttribute("player-unavailable")) {
@@ -259,6 +294,48 @@
     }
   }
 
+  /**
+   * Restore sound the extension's own behaviour took away.
+   *
+   * Only when the mute was not the viewer's choice: YouTube asked for it via
+   * muteOnStart, or sound was on immediately before a recovery reload and off
+   * immediately after (the browser's autoplay policy can mute a programmatic
+   * playVideo, and the two are indistinguishable afterwards). YouTube persists
+   * whatever state a load ends in, so one silenced video would otherwise
+   * silence every later one.
+   */
+  function undoForcedMute() {
+    if (off()) return;
+    const id = videoIdNow();
+    if (!id || unmuted.has(id)) return;
+    const player = document.getElementById("movie_player");
+    if (!player || typeof player.isMuted !== "function") return;
+
+    let response;
+    try {
+      response = player.getPlayerResponse && player.getPlayerResponse();
+    } catch {
+      return;
+    }
+    const audio = response && response.playerConfig && response.playerConfig.audioConfig;
+    const youtubeAskedForIt = !!(audio && audio.muteOnStart === true);
+    const weSilencedIt = mutedBeforeRecovery === false;
+    if (!youtubeAskedForIt && !weSilencedIt) return;
+
+    try {
+      if (player.isMuted()) {
+        player.unMute();
+        if (typeof player.getVolume === "function" && player.getVolume() === 0) {
+          player.setVolume(100);
+        }
+      }
+      unmuted.add(id);
+      document.documentElement.setAttribute("data-ytac-unmuted", "1");
+    } catch {
+      /* the viewer can always unmute by hand */
+    }
+  }
+
   async function recover() {
     if (off()) return;
     const id = videoIdNow();
@@ -279,16 +356,15 @@
       return;
     }
 
-    // Wait for the fresh response, then clear the UI the failed load left.
     for (let i = 0; i < 20; i++) {
       await sleep(500);
-      let status;
+      let response;
       try {
-        status = player.getPlayerResponse && player.getPlayerResponse();
+        response = player.getPlayerResponse && player.getPlayerResponse();
       } catch {
         return;
       }
-      if (status && status.playabilityStatus && status.playabilityStatus.status === "OK") {
+      if (response && response.playabilityStatus && response.playabilityStatus.status === "OK") {
         clearWallUi();
         try {
           player.playVideo();
@@ -306,82 +382,18 @@
     }
   }
 
-  // ---- undo the mute our own shaping provokes ------------------------------
-  //
-  // Shaping the request makes YouTube treat the load as a preview-ish context,
-  // and it answers with playerConfig.audioConfig.muteOnStart = true — so the
-  // video plays silently. Measured on a live load: muteOnStart true on a
-  // response that was otherwise perfect.
-  //
-  // The response is NOT edited to fix this. It is undone through the player's
-  // own unMute(), and only when YouTube asked for the mute in the first place,
-  // so a mute the viewer chose is never overridden.
-  const unmuted = new Set();
-
-  // Set just before a recovery reload, so sound can be put back exactly as the
-  // viewer had it. Null means "we have not intervened on this video".
-  let mutedBeforeRecovery = null;
-
-  function undoForcedMute() {
-    if (off()) return;
-    const id = videoIdNow();
-    if (!id || unmuted.has(id)) return;
-    const player = document.getElementById("movie_player");
-    if (!player || typeof player.isMuted !== "function") return;
-
-    let response;
-    try {
-      response = player.getPlayerResponse && player.getPlayerResponse();
-    } catch {
-      return;
-    }
-    const audio = response && response.playerConfig && response.playerConfig.audioConfig;
-
-    // Two ways our own behaviour can silence a video, and they are not
-    // distinguishable after the fact:
-    //   - YouTube answers a shaped request with muteOnStart, or
-    //   - the browser's autoplay policy mutes the programmatic playVideo()
-    //     that recovery performs, since there was no gesture behind it.
-    // Either way the test is the same: sound was on before we touched it, and
-    // is off now. A mute the viewer chose is never overridden, and YouTube
-    // persists whatever state it ends in to yt-player-volume — which is why a
-    // single silenced load otherwise makes every later video silent too.
-    const youtubeAskedForIt = !!(audio && audio.muteOnStart === true);
-    const weSilencedIt = mutedBeforeRecovery === false;
-    if (!youtubeAskedForIt && !weSilencedIt) return;
-
-    try {
-      if (player.isMuted()) {
-        player.unMute();
-        // unMute() restores the previous level, but a zeroed volume would
-        // leave it silent anyway.
-        if (typeof player.getVolume === "function" && player.getVolume() === 0) {
-          player.setVolume(100);
-        }
-      }
-      unmuted.add(id);
-      document.documentElement.setAttribute("data-ytac-unmuted", "1");
-    } catch {
-      /* the viewer can always unmute by hand */
-    }
-  }
-
-  function watchForWall() {
-    // The wall can be there on arrival, or appear a moment later, and YouTube
-    // navigates in-page without reloading. The forced mute is checked on the
-    // same schedule: it applies to any shaped load, not only a recovered one.
+  function watchPage() {
     [1500, 3000, 5000, 8000].forEach((ms) => setTimeout(recover, ms));
     [800, 1600, 2600, 4000, 6000, 9000].forEach((ms) => setTimeout(undoForcedMute, ms));
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", watchForWall, { once: true });
+    document.addEventListener("DOMContentLoaded", watchPage, { once: true });
   } else {
-    watchForWall();
+    watchPage();
   }
-  window.addEventListener("yt-navigate-finish", watchForWall);
+  window.addEventListener("yt-navigate-finish", watchPage);
 
-  Object.defineProperty(window, "__ytacShaped", { get: () => shaped });
-  Object.defineProperty(window, "__ytacStrategy", { get: () => strategy() });
+  Object.defineProperty(window, "__ytacNeutralised", { get: () => neutralised });
   publish();
 })();
