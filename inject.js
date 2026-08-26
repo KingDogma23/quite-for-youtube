@@ -5,18 +5,23 @@
  * and nothing else:
  *
  *   set-constant  ytInitialPlayerResponse.adPlacements  undefined
- *   set-constant  ytInitialPlayerResponse.adSlots       undefined
  *   set-constant  ytInitialPlayerResponse.playerAds     undefined
  *   set-constant  playerResponse.adPlacements           undefined
  *   set-constant  google_ad_status                      1
+ *
+ * adSlots is deliberately NOT in that list here, though uBO does name it.
+ * Neutralising it — as a getter or by deleting the key, both were measured —
+ * stops the player ever receiving media on videos that carry slots. See
+ * neutralise() for the numbers. google_ad_status is also close to pointless:
+ * YouTube sets it to 1 itself, measured with ?ytacnostatus=1.
  *
  * The equivalent of uBO's `$replace=` filters is NOT done here in page script.
  * uBO applies those in the NETWORK STACK, before the page sees the bytes. Doing
  * it in JavaScript meant wrapping fetch and waiting for the whole player
  * response to download before handing the page a rebuilt Response — a full
  * stall inserted into every player request, and the reason this felt slower
- * than uBO. Ad requests are blocked declaratively instead, in rules.json, which
- * costs nothing and never touches a response body.
+ * than uBO. Ad requests are not blocked at all: the declarative rules that did
+ * that were removed in 0.17.0 because they stopped playback outright.
  *
  * WHAT WAS REMOVED, AND WHY
  *
@@ -83,9 +88,9 @@
 
   // Which shape adSlots is given. Diagnostic switch; see neutralise().
   const slotsMode =
-    (location.search.match(/[?&]ytacslots=(keep|delete|undef)/) || [])[1] || "undef";
+    (location.search.match(/[?&]ytacslots=(keep|delete|undef)/) || [])[1] || "keep";
   try {
-    if (slotsMode !== "undef") {
+    if (slotsMode !== "keep") {
       document.documentElement.setAttribute("data-ytac-slots", slotsMode);
     }
   } catch {
@@ -130,31 +135,43 @@
     for (const key of AD_KEYS) {
       if (!(key in payload)) continue;
 
-      // adSlots is under suspicion, so it gets a switch rather than a rewrite.
+      // adSlots is LEFT ALONE, and that is the whole fix for the hang.
       //
-      // Measured on 2026-08-26 across 23 cold loads of never-visited videos:
-      // every load carrying adSlots either failed to start or took 5-10s, and
-      // every load without it started in about 1.5s. Nothing else separated
-      // them — not adPlacements, not playerAds, not monetisation as such.
+      // Measured on 2026-08-26, cold loads of never-visited videos, first
+      // frame taken from the page's own media events:
       //
-      // The mechanism this tests: defining a getter leaves the KEY in place
-      // while making it read undefined, so a guard of the form
-      // `if ("adSlots" in response)` still passes and the player then works
-      // with undefined. uBO's json-prune deletes the key outright, and that
-      // guard skips. Same intent, different observable shape.
+      //   adSlots -> getter undefined   n=14   0 fast, 6 slow (5-10s), 8 never
+      //   adSlots -> deleted            n=7    0 fast, 3 slow,          4 never
+      //   adSlots -> untouched          n=4    all fast (~1.5s)
+      //   no adSlots in the response    n=20+  all fast, ads gone
       //
-      //   ?ytacslots=keep     leave adSlots untouched
+      // The guess that got tested here was that the SHAPE of the edit was
+      // wrong — that a getter leaves the key present so `"adSlots" in r`
+      // still passes, where uBO's json-prune deletes it and that guard skips.
+      // Deleting the key measured the same as the getter. The shape is not
+      // what matters; removing the schedule at all is.
+      //
+      // What is left is a plain statement of fact: on videos where YouTube
+      // fills ad SLOTS, taking the slots away stops the player getting media.
+      // Those ads are handled the way this extension handles any ad that
+      // actually plays — the skip loop in content.js. Everything else still
+      // has its schedule neutralised, which is where the ads really do vanish.
+      //
+      //   (default)           leave adSlots untouched
       //   ?ytacslots=delete   delete the key, as json-prune does
-      //   (default)           the current getter
-      if (key === "adSlots" && slotsMode !== "undef") {
+      //   ?ytacslots=undef    the getter this shipped with, for re-testing
+      if (key === "adSlots") {
         if (slotsMode === "keep") continue;
-        try {
-          delete payload[key];
-          hit = true;
-        } catch {
-          /* a locked property is left alone */
+        if (slotsMode === "delete") {
+          try {
+            delete payload[key];
+            hit = true;
+          } catch {
+            /* a locked property is left alone */
+          }
+          continue;
         }
-        continue;
+        // slotsMode === "undef" falls through to the getter below.
       }
 
       try {
