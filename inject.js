@@ -81,9 +81,40 @@
     }
   }
 
+  /**
+   * Record what was scheduled BEFORE it is neutralised.
+   *
+   * Without this, a failed load cannot be told apart from a load that simply
+   * had no ad to remove — and that is exactly the distinction needed. On
+   * 2026-08-26 six of twenty videos never started with the extension on; all
+   * six were heavily monetised, and none reproduced later once repeat visits
+   * had stopped YouTube serving a pre-roll. That is a hypothesis about ad
+   * scheduling that no reading taken so far can confirm or kill, because the
+   * neutralisation erases the evidence before anything else looks at it.
+   */
+  const LABELS = { adPlacements: "P", adSlots: "S", playerAds: "A" };
+  const scheduled = [];
+
+  function recordSchedule(payload) {
+    for (const key of AD_KEYS) {
+      const value = payload[key];
+      const n = Array.isArray(value) ? value.length : value ? 1 : 0;
+      if (n) scheduled.push(`${LABELS[key]}=${n}`);
+    }
+    try {
+      document.documentElement.setAttribute(
+        "data-ytac-adsched",
+        scheduled.length ? scheduled.join(",") : "none",
+      );
+    } catch {
+      /* reporting only */
+    }
+  }
+
   /** Make one response's ad fields read as undefined, without deleting them. */
   function neutralise(payload) {
     if (off() || !isPlayerPayload(payload)) return false;
+    recordSchedule(payload);
     let hit = false;
     for (const key of AD_KEYS) {
       if (!(key in payload)) continue;
