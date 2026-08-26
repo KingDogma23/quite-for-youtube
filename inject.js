@@ -137,18 +137,48 @@
     }
   }
 
+  // A REAL bypass: nothing below is installed at all.
+  //
+  // The previous version consulted off() only inside neutralise(), so with
+  // ?ytacoff=1 the property accessors and google_ad_status were still replaced
+  // — the page was structurally modified while the switch claimed to be off.
+  // Every "both arms behave the same, so it is not us" conclusion drawn from
+  // that switch was comparing this extension against itself.
+  if (off()) {
+    try {
+      document.documentElement.setAttribute("data-ytac-bypassed", "1");
+    } catch {
+      /* reporting only */
+    }
+    return;
+  }
+
   guardGlobal("ytInitialPlayerResponse");
   guardGlobal("playerResponse");
 
   // Detection scripts read this to decide whether ads loaded.
-  try {
-    Object.defineProperty(window, "google_ad_status", {
-      configurable: true,
-      get: () => 1,
-      set: () => {},
-    });
-  } catch {
-    /* optional */
+  //
+  // Suspect: this claims ads loaded successfully while none ever play. If the
+  // player waits on an ad it believes is in flight, that would look exactly
+  // like readyState 0 with paused false — which is the symptom being chased.
+  // ?ytacnostatus=1 leaves this alone, so it can be isolated from the rest in
+  // a single page load rather than a build-and-reload cycle each time.
+  if (location.search.indexOf("ytacnostatus=1") === -1) {
+    try {
+      Object.defineProperty(window, "google_ad_status", {
+        configurable: true,
+        get: () => 1,
+        set: () => {},
+      });
+    } catch {
+      /* optional */
+    }
+  } else {
+    try {
+      document.documentElement.setAttribute("data-ytac-nostatus", "1");
+    } catch {
+      /* reporting only */
+    }
   }
 
   Object.defineProperty(window, "__ytacNeutralised", { get: () => neutralised });

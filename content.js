@@ -439,21 +439,24 @@
     // ?ytacoff=1 disables the whole extension for one page load, so the same
     // video can be measured with it on and off. Diagnostic only.
     const bypass = location.search.indexOf("ytacoff=1") !== -1;
-    off("data-ytac-all-off", settings.enabled && !bypass);
+    const on = settings.enabled && !bypass;
 
-    off("data-ytac-strip-off", settings.enabled && settings.stripAdSchedule);
+    off("data-ytac-all-off", on);
+    off("data-ytac-strip-off", on && settings.stripAdSchedule);
 
-    off("data-ytac-feed-off", settings.enabled && settings.hideFeedAds);
-    off("data-ytac-overlay-off", settings.enabled && settings.hideOverlays);
+    off("data-ytac-feed-off", on && settings.hideFeedAds);
+    off("data-ytac-overlay-off", on && settings.hideOverlays);
     // Merch is opt-IN, so the attribute is present only when it should hide.
-    if (settings.enabled && settings.hideMerch) root.setAttribute("data-ytac-merch-off", "1");
+    if (on && settings.hideMerch) root.setAttribute("data-ytac-merch-off", "1");
     else root.removeAttribute("data-ytac-merch-off");
   }
 
   // ------------------------------------------------------------------- loop
 
   function tick() {
-    if (!settings.enabled) return;
+    // The player loop must not run during a bypass either: it clicks, seeks
+    // and changes playbackRate, none of which a control arm may do.
+    if (!settings.enabled || location.search.indexOf("ytacoff=1") !== -1) return;
     try {
       if (!adIsPlaying()) seekAttempts = 0; // ad break over; restore the budget
       revertFalseSeek();
