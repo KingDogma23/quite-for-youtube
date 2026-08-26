@@ -9,59 +9,15 @@ A Chrome extension that removes ads from YouTube.
 | **Player overlays** | Banners drawn on top of the video |
 | **Merch shelves** | Product shelves under videos (optional, off by default) |
 
-YouTube's responses are never modified. The ad schedule is stopped at source
-instead: the request the player sends is declared as an ad unit rather than a
-watch page, and YouTube answers without an ad schedule of its own. Nothing is
-deleted and nothing is faked, so there is no mismatch between what the server
-sent and what the player sees — which is what YouTube's anti-adblock check
-looks for.
+Ads are blocked at the network layer: the requests that serve and track them
+are refused before they are made, using Chrome's declarative rules. The ad
+schedule is also neutralised in the page so nothing is queued for the player.
+Response bodies are never rewritten and no request is delayed.
 
-Earlier versions edited the response, and both ways of doing that failed
-usefully. Deleting the ad schedule gets the session flagged, and the flag is
-sticky for minutes, which makes any quick test unreadable. Rewriting the block
-itself produces a video that will not play at all, because a flagged session is
-simply not served usable stream data — the decision is made server-side and
-there is nothing on this end to repair. Everything returns the moment you switch
-it off.
-
-## Install
-
-Not on the Chrome Web Store, so it installs unpacked:
-
-1. Download the latest release and unzip it. You need the **folder**.
-   Keep it somewhere permanent — if you move or delete it, the extension stops working.
-2. Open `chrome://extensions`
-3. Turn on **Developer mode** (top right)
-4. Click **Load unpacked** and select the folder
-5. Reload any YouTube tab you already had open
-
-Works in Chrome, Edge, Brave and other Chromium browsers.
-
-## Options
-
-Click the extension icon. Changes apply immediately.
-
-| Option | Default | What it does |
-| --- | --- | --- |
-| Extension on | on | Master switch |
-| Skip video ads | on | Clicks Skip, seeks past unskippable ads |
-| Hide feed & search ads | on | Homepage, sidebar, search, masthead |
-| Hide player overlays | on | Banners on top of the video |
-| Hide merch shelves | off | Product shelves under videos |
-| Show status badge | off | Troubleshooting overlay |
-
-## Worth knowing
-
-**Feed ads never paint at all.** They are hidden before the page renders, so
-there is no flicker.
-
-**Two ways to deal with video ads, and one is opt-in.**
-
-The default is to let the ad start and get past it: Skip is clicked the moment
-it appears, unskippable ads are fast-forwarded, and seeking is a last resort
-that never touches anything longer than three minutes, because that is not an
-ad. You briefly see an ad begin. Verified on live ads — 37 in one session, 35
-skipped, 2 fast-forwarded, 2 seeked, zero false seeks.
+Earlier versions did this in page JavaScript, wrapping fetch to rewrite the
+player response. That works, but it waits for the whole response to download
+before releasing it to the player — a delay on every video. Blocking the ad
+requests declaratively costs nothing and is what the maintained blockers do.
 
 **Running two ad blockers is worse than running one.** Any network-level
 blocker will trigger the same wall, and with both installed you cannot tell
