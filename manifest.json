@@ -1,10 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Quiet for YouTube",
-  "version": "0.16.2",
+  "version": "0.17.0",
   "description": "Cleans up YouTube: skips video ads, and hides feed, sidebar, search and Shorts ad panels.",
   "permissions": [
-    "declarativeNetRequest",
     "storage"
   ],
   "host_permissions": [
@@ -45,14 +44,5 @@
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  },
-  "declarative_net_request": {
-    "rule_resources": [
-      {
-        "id": "ads",
-        "enabled": false,
-        "path": "rules.json"
-      }
-    ]
   }
 }
