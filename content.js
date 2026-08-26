@@ -436,7 +436,10 @@
 
     // Master switch, so the page-world script can tell "extension off" from
     // "this one feature off". The wall repair keys off this and nothing else.
-    off("data-ytac-all-off", settings.enabled);
+    // ?ytacoff=1 disables the whole extension for one page load, so the same
+    // video can be measured with it on and off. Diagnostic only.
+    const bypass = location.search.indexOf("ytacoff=1") !== -1;
+    off("data-ytac-all-off", settings.enabled && !bypass);
 
     off("data-ytac-strip-off", settings.enabled && settings.stripAdSchedule);
 

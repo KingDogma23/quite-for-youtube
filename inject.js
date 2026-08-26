@@ -97,6 +97,11 @@
 
   function off() {
     try {
+      // Diagnostic switch: ?ytacoff=1 disables everything for that one page
+      // load. It exists so the same video can be measured with this extension
+      // on and off without touching any settings — the A/B that says whether a
+      // problem is ours or YouTube's. Nothing sets it but a human typing it.
+      if (location.search.indexOf("ytacoff=1") !== -1) return true;
       const root = document.documentElement;
       return (
         root.hasAttribute("data-ytac-all-off") || root.hasAttribute("data-ytac-strip-off")
