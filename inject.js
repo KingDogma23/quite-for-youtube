@@ -25,7 +25,12 @@
  *    the key RENAMED rather than cut out. Crude deletion is what got sessions
  *    flagged; the structure is left intact here.
  *
- * 3. Requests are shaped only as an ESCAPE, never by default. Declaring the
+ * 3. Requests are shaped only as an ESCAPE, for sessions already flagged, and
+ *    the flag is REMEMBERED across page loads — arming it mid-load is too late,
+ *    because the first player request has already gone out by the time the wall
+ *    is visible. Never engaged on a healthy session.
+ *
+ *    Previously worded as: shaped only once a walled response has been seen. Declaring the
  *    load as a preview context is not what the maintained blockers do, and it
  *    is what makes YouTube answer with muteOnStart — the cause of silent
  *    playback. But the maintained approach assumes a session that was never
@@ -47,6 +52,37 @@
   // age-gated, geo-blocked or removed video. Declared here because the
   // response interceptors below run before anything further down.
   const WALL_WORDS = /ad ?block|allow ?list|allowlist|ads (allow|help)|violate/i;
+
+  const PARAMS_ESCAPE = "eAFgAQ";
+  const FLAG_KEY = "ytacSessionFlagged";
+  const FLAG_TTL_MS = 24 * 60 * 60 * 1000;
+
+  // Whether this session is flagged has to SURVIVE the page load.
+  //
+  // Measured: arming the escape mid-load does not rescue playback, because by
+  // the time the wall is visible the first player request has already gone out
+  // unshaped. The previous build worked only because it shaped from the very
+  // first request. So once a wall has been seen, that fact is remembered and
+  // the escape is armed before anything is requested — but only for sessions
+  // that have actually been walled, and only for a day, so a session that
+  // recovers stops paying the cost.
+  let flagged = (() => {
+    try {
+      const seen = Number(localStorage.getItem(FLAG_KEY) || 0);
+      return seen > 0 && Date.now() - seen < FLAG_TTL_MS;
+    } catch {
+      return false;
+    }
+  })();
+
+  function rememberFlagged() {
+    try {
+      localStorage.setItem(FLAG_KEY, String(Date.now()));
+    } catch {
+      /* private mode or storage disabled: this load still shapes */
+    }
+  }
+
 
   // A player response always carries one of these. Requiring one means this
   // can only ever act on a real player payload, never on something that merely
@@ -142,6 +178,14 @@
     }
   }
 
+  if (flagged) {
+    try {
+      document.documentElement.setAttribute("data-ytac-flagged", "remembered");
+    } catch {
+      /* reporting only */
+    }
+  }
+
   guardGlobal("ytInitialPlayerResponse");
   guardGlobal("playerResponse");
 
@@ -204,9 +248,6 @@
   // played at all. It carries a cost (YouTube answers with muteOnStart, undone
   // below), so it is engaged ONLY once a flagged response has actually been
   // seen, and never on a healthy session.
-  const PARAMS_ESCAPE = "eAFgAQ";
-  let flagged = false;
-
   function noteFlagged(payload) {
     if (flagged || !payload) return;
     const ps = payload.playabilityStatus;
@@ -217,6 +258,7 @@
       return;
     }
     flagged = true;
+    rememberFlagged();
     try {
       document.documentElement.setAttribute("data-ytac-flagged", "1");
     } catch {
@@ -454,6 +496,23 @@
     if (!wallShowing()) return;
 
     recovered.add(id);
+
+    // Arm the escape BEFORE reloading, so the request this triggers carries
+    // the shaped params. Checking only at assignment misses it: measured live,
+    // the embedded response arrives with status OK and the block is written
+    // into it afterwards, so noteFlagged never fired while the page was
+    // plainly walled — recovery then fetched an unshaped response, YouTube
+    // returned OK with 35 formats, and served no media at all.
+    if (!flagged) {
+      flagged = true;
+      rememberFlagged();
+      try {
+        document.documentElement.setAttribute("data-ytac-flagged", "1");
+      } catch {
+        /* reporting only */
+      }
+    }
+
     try {
       mutedBeforeRecovery = player.isMuted ? player.isMuted() : null;
     } catch {
