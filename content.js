@@ -424,6 +424,16 @@
     const off = (name, on) =>
       on ? root.removeAttribute(name) : root.setAttribute(name, "1");
 
+    // Stamp the running version onto the page. An unpacked extension keeps
+    // serving its old code until Reload is pressed, and results were twice
+    // reported from a build that was not actually running. This makes "which
+    // build is live" readable without guessing.
+    try {
+      root.setAttribute("data-ytac-version", VERSION);
+    } catch {
+      /* reporting only */
+    }
+
     // Master switch, so the page-world script can tell "extension off" from
     // "this one feature off". The wall repair keys off this and nothing else.
     off("data-ytac-all-off", settings.enabled);

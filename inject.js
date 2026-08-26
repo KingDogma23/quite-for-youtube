@@ -25,9 +25,14 @@
  *    the key RENAMED rather than cut out. Crude deletion is what got sessions
  *    flagged; the structure is left intact here.
  *
- * 3. Requests are no longer shaped. Declaring the load as a preview context is
- *    not what the maintained blockers do, and it is what made YouTube answer
- *    with muteOnStart — the cause of videos playing silently.
+ * 3. Requests are shaped only as an ESCAPE, never by default. Declaring the
+ *    load as a preview context is not what the maintained blockers do, and it
+ *    is what makes YouTube answer with muteOnStart — the cause of silent
+ *    playback. But the maintained approach assumes a session that was never
+ *    flagged, and it does not rescue one that is: measured here, the embedded
+ *    response comes back status ERROR on every load, and after recovery the
+ *    player holds 35 adaptive formats while YouTube serves no media at all.
+ *    So shaping is armed only once a walled response has actually been seen.
  *
  * Every path is wrapped: any failure leaves the data exactly as it arrived,
  * because a broken YouTube is far worse than an ad.
@@ -37,6 +42,11 @@
   "use strict";
 
   const AD_KEYS = ["adPlacements", "adSlots", "playerAds", "adBreakHeartbeatParams"];
+
+  // Wording that means the block is about ad blocking, not a private,
+  // age-gated, geo-blocked or removed video. Declared here because the
+  // response interceptors below run before anything further down.
+  const WALL_WORDS = /ad ?block|allow ?list|allowlist|ads (allow|help)|violate/i;
 
   // A player response always carries one of these. Requiring one means this
   // can only ever act on a real player payload, never on something that merely
@@ -119,6 +129,7 @@
         get: () => held,
         set: (value) => {
           try {
+            noteFlagged(value); // a walled embedded response arms the escape
             neutralise(value);
           } catch {
             /* never block the assignment */
@@ -179,6 +190,64 @@
     neutralised++;
     publish();
     return out;
+  }
+
+  // ---- escape hatch for a session YouTube has already flagged --------------
+  //
+  // Neutralising the ad payload is the right mechanism for a healthy session,
+  // and it is what every maintained blocker does. It does NOT rescue a session
+  // that is already flagged: measured here, the embedded response comes back
+  // status ERROR on every load, and after recovery the player holds 35
+  // adaptive formats but YouTube serves no media at all — buffering forever.
+  //
+  // Shaping the outgoing request escapes that, which is why the previous build
+  // played at all. It carries a cost (YouTube answers with muteOnStart, undone
+  // below), so it is engaged ONLY once a flagged response has actually been
+  // seen, and never on a healthy session.
+  const PARAMS_ESCAPE = "eAFgAQ";
+  let flagged = false;
+
+  function noteFlagged(payload) {
+    if (flagged || !payload) return;
+    const ps = payload.playabilityStatus;
+    if (!ps || !ps.status || ps.status === "OK") return;
+    try {
+      if (!WALL_WORDS.test(JSON.stringify(ps))) return;
+    } catch {
+      return;
+    }
+    flagged = true;
+    try {
+      document.documentElement.setAttribute("data-ytac-flagged", "1");
+    } catch {
+      /* reporting only */
+    }
+  }
+
+  const looksLikePlayerRequest = (v) =>
+    v && typeof v === "object" && v.context && v.context.client &&
+    (v.videoId || v.playbackContext || v.playerRequest);
+
+  const nativeStringify = JSON.stringify;
+  JSON.stringify = function (value, ...rest) {
+    try {
+      if (flagged && !off() && looksLikePlayerRequest(value)) {
+        if (typeof value.params !== "string" || !value.params.startsWith("YAHI")) {
+          value.params = PARAMS_ESCAPE;
+          if (value.playerRequest) value.playerRequest.params = PARAMS_ESCAPE;
+          if (value.playbackContext) value.playbackContext.params = PARAMS_ESCAPE;
+        }
+      }
+    } catch {
+      /* leave the request exactly as the page built it */
+    }
+    return nativeStringify.call(this, value, ...rest);
+  };
+  try {
+    Object.defineProperty(JSON.stringify, "name", { value: "stringify" });
+    JSON.stringify.toString = () => nativeStringify.toString();
+  } catch {
+    /* cosmetic */
   }
 
   const urlOf = (input) =>
@@ -250,8 +319,48 @@
   // Verified live: status ERROR with the wall showing, then after this
   // sequence status OK, no ad schedule, wall gone, video playing.
 
-  const WALL_WORDS = /ad ?block|allow ?list|allowlist|ads (allow|help)|violate/i;
   const recovered = new Set();
+
+  // ---- keep the accusation off the screen ---------------------------------
+  //
+  // The block is decided server-side and arrives baked into the page, so it is
+  // painted before any recovery can run. Measured: the wall is fully visible at
+  // 4 seconds and only clears at about 10. Showing someone "Ad blockers violate
+  // YouTube's Terms of Service" for six seconds on every single video is a
+  // worse experience than the ad was.
+  //
+  // The error screen is therefore hidden from the first paint and revealed
+  // again if it turns out to be a GENUINE error — a private, age-gated,
+  // geo-blocked or removed video, none of which are ours to hide. If nothing
+  // has cleared it by the deadline, it is shown, because failing visibly beats
+  // a viewer staring at a black rectangle with no explanation.
+  const HIDE_STYLE_ID = "ytac-hold-error";
+  const REVEAL_AFTER_MS = 12000;
+
+  function holdErrorScreen() {
+    if (off() || document.getElementById(HIDE_STYLE_ID)) return;
+    try {
+      const style = document.createElement("style");
+      style.id = HIDE_STYLE_ID;
+      style.textContent =
+        "ytd-watch-flexy[player-unavailable] #error-screen," +
+        "yt-playability-error-supported-renderers," +
+        ".ytp-error { visibility: hidden !important; }";
+      (document.head || document.documentElement).appendChild(style);
+      setTimeout(revealErrorScreen, REVEAL_AFTER_MS);
+    } catch {
+      /* if the style cannot be added the wall simply shows, as before */
+    }
+  }
+
+  function revealErrorScreen() {
+    try {
+      const style = document.getElementById(HIDE_STYLE_ID);
+      if (style) style.remove();
+    } catch {
+      /* nothing to undo */
+    }
+  }
   const unmuted = new Set();
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   let mutedBeforeRecovery = null;
@@ -366,6 +475,7 @@
       }
       if (response && response.playabilityStatus && response.playabilityStatus.status === "OK") {
         clearWallUi();
+        revealErrorScreen(); // recovered: the hold is no longer needed
         try {
           player.playVideo();
         } catch {
@@ -383,8 +493,24 @@
   }
 
   function watchPage() {
+    // Held before anything is measured, because the wall is already painted by
+    // the time the first check runs.
+    if (location.pathname === "/watch") holdErrorScreen();
     [1500, 3000, 5000, 8000].forEach((ms) => setTimeout(recover, ms));
     [800, 1600, 2600, 4000, 6000, 9000].forEach((ms) => setTimeout(undoForcedMute, ms));
+    // A block that is NOT about ad blocking belongs to the viewer, not to us.
+    setTimeout(() => {
+      const player = document.getElementById("movie_player");
+      let ps;
+      try {
+        const response = player && player.getPlayerResponse && player.getPlayerResponse();
+        ps = response && response.playabilityStatus;
+      } catch {
+        return revealErrorScreen();
+      }
+      if (!ps || ps.status === "OK") return; // nothing to show anyway
+      if (!WALL_WORDS.test(JSON.stringify(ps))) revealErrorScreen();
+    }, 2500);
   }
 
   if (document.readyState === "loading") {
