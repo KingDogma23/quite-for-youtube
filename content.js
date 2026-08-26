@@ -13,9 +13,19 @@
  *      The only lever is the player: click Skip when it appears, and seek past
  *      anything unskippable. That is what most of this file does.
  *
- * Deliberately no network blocking. Blocking ad REQUESTS is what YouTube's
- * anti-adblock detection looks for; letting the request succeed and skipping
- * the playback keeps that quiet.
+ * No network blocking — and the original reason given for that was wrong.
+ *
+ * This file used to claim that blocking ad requests is what triggers YouTube's
+ * anti-adblock detection. That was never measured, and uBlock Origin blocks
+ * requests constantly without being flagged. What actually happened when
+ * blocking was tried here (0.16.0, eight hand-written declarative rules) is
+ * that playback stopped: readyState stayed at 0 with the rules enabled and
+ * reached 4 with the same build and the rules disabled.
+ *
+ * The real reason there is no network blocking is that deciding which requests
+ * to block is a maintained filter list's job. Eight rules written from memory
+ * do not approximate one; they break the player in a way that looks like the
+ * extension is faulty. The ad schedule is neutralised in the page instead.
  */
 
 (() => {
@@ -26,15 +36,97 @@
   // than useless, and this file and manifest.json had already diverged.
   const VERSION = chrome.runtime.getManifest().version;
 
+  /**
+   * Time-to-first-frame, measured by the page rather than by polling from
+   * outside it.
+   *
+   * Two separate failures made this necessary on 2026-08-26:
+   *
+   *   - Polling from a driver samples at whatever moment the driver happens to
+   *     run. "readyState 0 at 5s" only means the sample landed at 5s; it says
+   *     nothing about when the frame actually arrived. Media events carry
+   *     their own timestamps, so this measures the event, not the sample.
+   *   - Every reading that day was taken in a BACKGROUND tab, which hydrates
+   *     differently, and nothing in the output said so. A whole gate run was
+   *     reported before that was noticed. So visibility is now recorded
+   *     alongside the timing and travels with it.
+   *
+   * This runs unconditionally — including under ?ytacoff=1. A measurement that
+   * switches off with the thing being measured cannot produce a control arm.
+   * It only reads and stamps attributes; it never touches playback.
+   */
+  function installTimeline() {
+    const root = document.documentElement;
+    const marks = Object.create(null);
+    // performance.now() is milliseconds since navigation started, so an event
+    // timestamp is time-to-that-event with no arithmetic and no clock skew.
+    const at = () => Math.round(performance.now());
+    let hiddenEver = document.visibilityState === "hidden";
+
+    const publish = () => {
+      try {
+        root.setAttribute(
+          "data-ytac-ttff",
+          Object.keys(marks)
+            .map((k) => `${k}=${marks[k]}`)
+            .join(","),
+        );
+        // Any reading taken while this says 1 is void. Foreground the tab and
+        // measure again.
+        root.setAttribute("data-ytac-hidden", hiddenEver ? "1" : "0");
+      } catch {
+        /* reporting must never break playback */
+      }
+    };
+
+    const mark = (name) => {
+      if (name in marks) return; // first occurrence only
+      marks[name] = at();
+      publish();
+    };
+
+    try {
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") {
+          hiddenEver = true;
+          publish();
+        }
+      });
+
+      // Media events do not bubble, but they still travel the capture phase,
+      // so one listener on the document catches every <video> the player
+      // creates — including ones replaced mid-session on a soft navigation.
+      for (const type of ["loadstart", "loadedmetadata", "loadeddata", "playing"]) {
+        document.addEventListener(type, () => mark(type), true);
+      }
+      // The decisive number: content actually advancing, not merely a player
+      // that reports itself as unpaused.
+      document.addEventListener(
+        "timeupdate",
+        (e) => {
+          if (e.target && e.target.currentTime > 0) mark("advancing");
+        },
+        true,
+      );
+    } catch {
+      /* diagnostics are optional; playback is not */
+    }
+
+    publish();
+  }
+
+  installTimeline();
+
   const DEFAULTS = {
     enabled: true,
     skipVideoAds: true,
     hideFeedAds: true,
     hideOverlays: true,
     hideMerch: false,
-    // Rewrites the OUTGOING player request so YouTube answers without an ad
-    // schedule. Nothing in the response is edited, which is what kept every
-    // earlier attempt detectable. See inject.js.
+    // Makes the player response's ad fields read as undefined, in the page,
+    // exactly as uBO does. Request shaping was tried and removed: it did not
+    // rescue a flagged session, and it made YouTube answer with muteOnStart.
+    // See inject.js.
     stripAdSchedule: true,
     badge: false,
   };
