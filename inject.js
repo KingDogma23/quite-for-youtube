@@ -81,6 +81,17 @@
     }
   }
 
+  // Which shape adSlots is given. Diagnostic switch; see neutralise().
+  const slotsMode =
+    (location.search.match(/[?&]ytacslots=(keep|delete|undef)/) || [])[1] || "undef";
+  try {
+    if (slotsMode !== "undef") {
+      document.documentElement.setAttribute("data-ytac-slots", slotsMode);
+    }
+  } catch {
+    /* reporting only */
+  }
+
   /**
    * Record what was scheduled BEFORE it is neutralised.
    *
@@ -118,6 +129,34 @@
     let hit = false;
     for (const key of AD_KEYS) {
       if (!(key in payload)) continue;
+
+      // adSlots is under suspicion, so it gets a switch rather than a rewrite.
+      //
+      // Measured on 2026-08-26 across 23 cold loads of never-visited videos:
+      // every load carrying adSlots either failed to start or took 5-10s, and
+      // every load without it started in about 1.5s. Nothing else separated
+      // them — not adPlacements, not playerAds, not monetisation as such.
+      //
+      // The mechanism this tests: defining a getter leaves the KEY in place
+      // while making it read undefined, so a guard of the form
+      // `if ("adSlots" in response)` still passes and the player then works
+      // with undefined. uBO's json-prune deletes the key outright, and that
+      // guard skips. Same intent, different observable shape.
+      //
+      //   ?ytacslots=keep     leave adSlots untouched
+      //   ?ytacslots=delete   delete the key, as json-prune does
+      //   (default)           the current getter
+      if (key === "adSlots" && slotsMode !== "undef") {
+        if (slotsMode === "keep") continue;
+        try {
+          delete payload[key];
+          hit = true;
+        } catch {
+          /* a locked property is left alone */
+        }
+        continue;
+      }
+
       try {
         if (payload[key] === undefined) continue;
         Object.defineProperty(payload, key, {
