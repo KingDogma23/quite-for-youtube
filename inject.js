@@ -26,18 +26,16 @@
  *    flagged; the structure is left intact here.
  *
  * 3. Requests are shaped only as an ESCAPE, for sessions already flagged, and
- *    the flag is REMEMBERED across page loads — arming it mid-load is too late,
- *    because the first player request has already gone out by the time the wall
- *    is visible. Never engaged on a healthy session.
+ *    never on a healthy one — declaring the load as a preview context is what
+ *    makes YouTube answer with muteOnStart, the cause of silent playback.
  *
- *    Previously worded as: shaped only once a walled response has been seen. Declaring the
- *    load as a preview context is not what the maintained blockers do, and it
- *    is what makes YouTube answer with muteOnStart — the cause of silent
- *    playback. But the maintained approach assumes a session that was never
- *    flagged, and it does not rescue one that is: measured here, the embedded
- *    response comes back status ERROR on every load, and after recovery the
- *    player holds 35 adaptive formats while YouTube serves no media at all.
- *    So shaping is armed only once a walled response has actually been seen.
+ *    Measured, and worth recording because three builds were spent on it: this
+ *    does NOT rescue a flagged session. With the extension fully bypassed via
+ *    ?ytacoff=1, the embedded response still comes back status ERROR, the wall
+ *    still appears and the video still does not play. The block is decided on
+ *    YouTube's side and nothing in this file changes it. An earlier version of
+ *    this comment claimed shaping was what made the older build work; it was
+ *    not — that build simply ran before the session had been flagged.
  *
  * Every path is wrapped: any failure leaves the data exactly as it arrived,
  * because a broken YouTube is far worse than an ad.
@@ -57,15 +55,12 @@
   const FLAG_KEY = "ytacSessionFlagged";
   const FLAG_TTL_MS = 24 * 60 * 60 * 1000;
 
-  // Whether this session is flagged has to SURVIVE the page load.
+  // Whether this session is flagged is remembered across page loads, so the
+  // escape is armed before the first request rather than after the wall is
+  // already visible.
   //
-  // Measured: arming the escape mid-load does not rescue playback, because by
-  // the time the wall is visible the first player request has already gone out
-  // unshaped. The previous build worked only because it shaped from the very
-  // first request. So once a wall has been seen, that fact is remembered and
-  // the escape is armed before anything is requested — but only for sessions
-  // that have actually been walled, and only for a day, so a session that
-  // recovers stops paying the cost.
+  // Kept because it costs nothing on a healthy session, NOT because it fixes a
+  // flagged one — the A/B above shows it does not. Only YouTube clears that.
   let flagged = (() => {
     try {
       const seen = Number(localStorage.getItem(FLAG_KEY) || 0);
@@ -408,6 +403,77 @@
       /* nothing to undo */
     }
   }
+
+  // ---- say so when playback is never going to start -----------------------
+  //
+  // Measured with the extension fully bypassed (?ytacoff=1): the embedded
+  // response still comes back status ERROR, the wall still appears and the
+  // video still does not play. YouTube has flagged the session server-side and
+  // will not serve media, whatever runs in the page.
+  //
+  // Hiding the wall and leaving a spinner turning forever is worse than the
+  // accusation was: it looks like the extension is broken and gives no way to
+  // act. So after a fair wait with no media at all, the position is stated
+  // plainly, with what actually clears it.
+  const STALL_NOTICE_ID = "ytac-stalled";
+  const STALL_AFTER_MS = 11000;
+
+  function showStalledNotice() {
+    try {
+      if (off() || document.getElementById(STALL_NOTICE_ID)) return;
+      const v = document.querySelector("video");
+      if (v && (v.readyState > 2 || v.currentTime > 0.5)) return; // playing after all
+      if (!wallShowing() && !(v && v.readyState === 0)) return;
+
+      const host = document.querySelector("#movie_player") || document.body;
+      if (!host) return;
+
+      const box = document.createElement("div");
+      box.id = STALL_NOTICE_ID;
+      box.style.cssText =
+        "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;" +
+        "z-index:60;background:#0f0f0f;color:#f1f1f1;text-align:center;padding:24px;" +
+        "font:14px/1.5 Roboto,Arial,sans-serif;pointer-events:auto;";
+      const inner = document.createElement("div");
+      inner.style.cssText = "max-width:420px;";
+
+      const h = document.createElement("div");
+      h.textContent = "YouTube has blocked playback for this session";
+      h.style.cssText = "font-size:16px;font-weight:500;margin-bottom:10px;";
+
+      const p = document.createElement("p");
+      p.textContent =
+        "This is decided on YouTube's side and happens with the extension " +
+        "switched off too, so turning it off will not help. It usually clears " +
+        "on its own after a while.";
+      p.style.cssText = "margin:0 0 12px;color:#aaa;";
+
+      const p2 = document.createElement("p");
+      p2.textContent =
+        "To clear it now: delete youtube.com site data in Chrome (you will be " +
+        "signed back in), or open the video in another profile.";
+      p2.style.cssText = "margin:0;color:#aaa;";
+
+      inner.append(h, p, p2);
+      box.append(inner);
+      if (getComputedStyle(host).position === "static") host.style.position = "relative";
+      host.appendChild(box);
+      revealErrorScreen(); // nothing left to hide behind
+      document.documentElement.setAttribute("data-ytac-stalled", "1");
+    } catch {
+      /* a missing notice is not worth breaking the page over */
+    }
+  }
+
+  function clearStalledNotice() {
+    try {
+      const box = document.getElementById(STALL_NOTICE_ID);
+      if (box) box.remove();
+      document.documentElement.removeAttribute("data-ytac-stalled");
+    } catch {
+      /* nothing to undo */
+    }
+  }
   const unmuted = new Set();
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   let mutedBeforeRecovery = null;
@@ -546,6 +612,7 @@
           /* the user can press play */
         }
         undoForcedMute();
+        clearStalledNotice();
         try {
           document.documentElement.setAttribute("data-ytac-recovered", "1");
         } catch {
@@ -560,6 +627,8 @@
     // Held before anything is measured, because the wall is already painted by
     // the time the first check runs.
     if (location.pathname === "/watch") holdErrorScreen();
+    clearStalledNotice(); // a new video deserves a fresh chance
+    setTimeout(showStalledNotice, STALL_AFTER_MS);
     [1500, 3000, 5000, 8000].forEach((ms) => setTimeout(recover, ms));
     [800, 1600, 2600, 4000, 6000, 9000].forEach((ms) => setTimeout(undoForcedMute, ms));
     // A block that is NOT about ad blocking belongs to the viewer, not to us.
