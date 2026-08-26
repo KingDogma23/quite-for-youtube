@@ -44,7 +44,16 @@
 (() => {
   "use strict";
 
-  const AD_KEYS = ["adPlacements", "adSlots", "playerAds", "adBreakHeartbeatParams"];
+  // EXACTLY the three keys uBlock Origin's live rules neutralise, and no more.
+  //
+  // adBreakHeartbeatParams used to be in this list. It is not in theirs, and it
+  // was carried over from an older build without checking. Measured with the
+  // session flag cleared: with this extension on, playback never started
+  // (readyState 0); bypassed via ?ytacoff=1 on the same video, it played. So on
+  // a healthy session this list was what broke playback — the earlier A/B was
+  // run while the session was flagged, where nothing played either way, which
+  // hid the fault entirely.
+  const AD_KEYS = ["adPlacements", "adSlots", "playerAds"];
 
   // Wording that means the block is about ad blocking, not a private,
   // age-gated, geo-blocked or removed video. Declared here because the
@@ -415,13 +424,26 @@
   // accusation was: it looks like the extension is broken and gives no way to
   // act. So after a fair wait with no media at all, the position is stated
   // plainly, with what actually clears it.
+  /** The main player's video element, not a preview or miniplayer one. */
+  function mainVideo() {
+    try {
+      return (
+        document.querySelector("#movie_player video") ||
+        document.querySelector("video.html5-main-video") ||
+        document.querySelector("video")
+      );
+    } catch {
+      return null;
+    }
+  }
+
   const STALL_NOTICE_ID = "ytac-stalled";
   const STALL_AFTER_MS = 11000;
 
   function showStalledNotice() {
     try {
       if (off() || document.getElementById(STALL_NOTICE_ID)) return;
-      const v = document.querySelector("video");
+      const v = mainVideo();
       if (v && (v.readyState > 2 || v.currentTime > 0.5)) return; // playing after all
       if (!wallShowing() && !(v && v.readyState === 0)) return;
 
@@ -460,6 +482,20 @@
       host.appendChild(box);
       revealErrorScreen(); // nothing left to hide behind
       document.documentElement.setAttribute("data-ytac-stalled", "1");
+
+      // Playback can still begin after the notice appears — measured: it
+      // showed at 11s over a video that started shortly after and then sat
+      // there covering it. Anything that means "media is flowing" takes it
+      // away again.
+      const media = mainVideo();
+      if (media) {
+        const dismiss = () => {
+          if (media.currentTime > 0.5 || media.readyState > 2) clearStalledNotice();
+        };
+        media.addEventListener("timeupdate", dismiss);
+        media.addEventListener("playing", dismiss);
+        media.addEventListener("loadeddata", dismiss);
+      }
     } catch {
       /* a missing notice is not worth breaking the page over */
     }
