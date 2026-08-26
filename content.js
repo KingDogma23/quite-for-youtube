@@ -533,13 +533,19 @@
     const bypass = location.search.indexOf("ytacoff=1") !== -1;
     const on = settings.enabled && !bypass;
 
+    // ?ytacnocss=1 — the stylesheet stands down, the rest stays on. Every rule
+    // in content.css is gated on one of these attributes, so setting them all
+    // is equivalent to not shipping the CSS for this load. One of three
+    // switches that let the failing subsystem be named; see inject.js.
+    const noCss = location.search.indexOf("ytacnocss=1") !== -1;
+
     off("data-ytac-all-off", on);
     off("data-ytac-strip-off", on && settings.stripAdSchedule);
 
-    off("data-ytac-feed-off", on && settings.hideFeedAds);
-    off("data-ytac-overlay-off", on && settings.hideOverlays);
+    off("data-ytac-feed-off", on && settings.hideFeedAds && !noCss);
+    off("data-ytac-overlay-off", on && settings.hideOverlays && !noCss);
     // Merch is opt-IN, so the attribute is present only when it should hide.
-    if (on && settings.hideMerch) root.setAttribute("data-ytac-merch-off", "1");
+    if (on && settings.hideMerch && !noCss) root.setAttribute("data-ytac-merch-off", "1");
     else root.removeAttribute("data-ytac-merch-off");
   }
 
@@ -574,6 +580,18 @@
   function start() {
     console.log(`[YT Ad Cleaner ${VERSION}] active on ${location.pathname}`);
     applyCssToggles();
+
+    // ?ytacnoloop=1 — the player loop stands down, the stylesheet and the
+    // page-world script stay on. Third of the three bisect switches.
+    if (location.search.indexOf("ytacnoloop=1") !== -1) {
+      try {
+        document.documentElement.setAttribute("data-ytac-noloop", "1");
+      } catch {
+        /* reporting only */
+      }
+      return;
+    }
+
     tick();
     // A timer alone, deliberately.
     //

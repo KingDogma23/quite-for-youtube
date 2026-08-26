@@ -153,6 +153,23 @@
     return;
   }
 
+  // ?ytacnoinject=1 — everything else stays on, only this file stands down.
+  //
+  // Measured on 2026-08-26: across 20 videos, one load each, six never got
+  // past `loadstart` with the extension on, and all twenty played with it
+  // bypassed. `?ytacoff=1` proves the extension is responsible but not WHICH
+  // part, and the whole-extension switch is the only one that existed. This
+  // splits the page-world script off from the stylesheet and the player loop
+  // so the failing third can be named rather than guessed at.
+  if (location.search.indexOf("ytacnoinject=1") !== -1) {
+    try {
+      document.documentElement.setAttribute("data-ytac-noinject", "1");
+    } catch {
+      /* reporting only */
+    }
+    return;
+  }
+
   guardGlobal("ytInitialPlayerResponse");
   guardGlobal("playerResponse");
 
