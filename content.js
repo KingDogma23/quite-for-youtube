@@ -185,6 +185,7 @@
         // for the session, so a slow hop showed "200x41" — the total since the
         // page opened, which says nothing about the four seconds in question.
         media: mediaDelta(),
+        stalls: stalls ? `stall${stalls}/${stallWorst}ms` : "",
         hidden: hiddenEver ? 1 : 0,
       });
       if (hops.length > LOG_MAX) hops.shift();
@@ -196,9 +197,38 @@
             .slice(-12)
             .map(
               (h) =>
-                `${h.n}:${h.id}:${h.play}ms:gap${h.gap}:${h.sched}:${h.media}:h${h.hidden}`,
+                `${h.n}:${h.id}:${h.play}ms:gap${h.gap}:${h.sched}:${h.media}:${h.stalls}:h${h.hidden}`,
             )
             .join(" | "),
+        );
+      } catch {
+        /* reporting only */
+      }
+    };
+
+    /**
+     * Stalls DURING playback, which is what the viewer actually sees.
+     *
+     * Everything above measures time-to-first-frame. On 2026-08-27 a hop was
+     * logged at 188ms — a clean, fast start — while the player in front of the
+     * viewer sat at readyState 0 with an empty buffer, spinning. It had
+     * started and then lost its media. Start time is simply the wrong moment:
+     * a video that begins instantly and rebuffers for four seconds a minute in
+     * is indistinguishable, by that measure, from one that never stutters.
+     *
+     * The media element already announces this. "waiting" fires when playback
+     * halts for want of data, "playing" when it resumes.
+     */
+    let stallStart = null;
+    let stalls = 0;
+    let stallWorst = 0;
+    let stallTotal = 0;
+
+    const publishStalls = () => {
+      try {
+        root.setAttribute(
+          "data-ytac-rebuffer",
+          `n=${stalls},worst=${stallWorst}ms,total=${stallTotal}ms`,
         );
       } catch {
         /* reporting only */
@@ -264,6 +294,11 @@
       navBase = performance.now();
       navCount++;
       mediaAtHopStart = readMedia();
+      stallStart = null;
+      stalls = 0;
+      stallWorst = 0;
+      stallTotal = 0;
+      publishStalls();
       // Visibility is judged PER VIDEO, not per document. The flag used to
       // latch for the life of the page, so one glance at another tab marked
       // every subsequent hop void — in a clicking session that is every
@@ -294,6 +329,32 @@
       for (const type of ["loadstart", "loadedmetadata", "loadeddata", "playing"]) {
         document.addEventListener(type, () => mark(type), true);
       }
+
+      // A stall only counts once playback has actually begun; "waiting" also
+      // fires during a normal cold start, which is measured separately above.
+      document.addEventListener(
+        "waiting",
+        (e) => {
+          if (!e.target || !(e.target.currentTime > 0)) return;
+          if (stallStart === null) stallStart = performance.now();
+        },
+        true,
+      );
+      document.addEventListener(
+        "playing",
+        () => {
+          if (stallStart === null) return;
+          const held = Math.round(performance.now() - stallStart);
+          stallStart = null;
+          // Under 200ms is a seek settling, not a stall worth reporting.
+          if (held < 200) return;
+          stalls++;
+          stallTotal += held;
+          if (held > stallWorst) stallWorst = held;
+          publishStalls();
+        },
+        true,
+      );
       // The decisive number: content actually advancing, not merely a player
       // that reports itself as unpaused.
       document.addEventListener(
