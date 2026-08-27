@@ -1,5 +1,5 @@
 /**
- * Quiet for YouTube — page-world ad neutralisation.
+ * Quite for YouTube — page-world ad neutralisation.
  *
  * Deliberately minimal. This does what uBlock Origin's live YouTube rules do,
  * and nothing else:
@@ -15,33 +15,51 @@
  * neutralise() for the numbers. google_ad_status is also close to pointless:
  * YouTube sets it to 1 itself, measured with ?ytacnostatus=1.
  *
- * The equivalent of uBO's `$replace=` filters is NOT done here in page script.
- * uBO applies those in the NETWORK STACK, before the page sees the bytes. Doing
- * it in JavaScript meant wrapping fetch and waiting for the whole player
- * response to download before handing the page a rebuilt Response — a full
- * stall inserted into every player request, and the reason this felt slower
- * than uBO. Ad requests are not blocked at all: the declarative rules that did
- * that were removed in 0.17.0 because they stopped playback outright.
+ * TWO THINGS THIS FILE USED TO CLAIM ABOUT uBO, BOTH FALSE
+ *
+ * Read from uBlock Origin's live lists on 2026-08-27 (uAssets filters.txt and
+ * quick-fixes.txt), rather than from memory:
+ *
+ *   1. It said uBO applies its `$replace=` filters in the NETWORK STACK, so
+ *      doing the same in page script would be a needless stall. The network
+ *      form is the `!#else` branch, taken only where the browser can filter
+ *      response bodies — Firefox. On Chrome, the `!#if !cap_html_filtering`
+ *      branch is taken and uBO does exactly what this file called too slow:
+ *      trusted-replace-fetch-response and trusted-replace-xhr-response, in
+ *      page script, renaming `"adSlots"` to `"no_ads"` in /player responses.
+ *
+ *   2. It said recovery — reloading the player after a stall — was additive
+ *      complexity uBO does not have. uBO has it. quick-fixes.txt patches
+ *      YouTube's own serverContract() with a watcher that reads
+ *      getStatsForNerds() and, on buffer_health_seconds "0.00 s" with
+ *      resolution "0x0", calls loadVideoById to retry the load under a
+ *      rotated client userAgent. That stall signature is the one measured
+ *      here: media never arrives and the player sits at readyState 0.
+ *
+ * So uBO does neutralise adSlots on www.youtube.com, and it evidently hits the
+ * same wall, because it ships a dedicated recovery for it — plus a seek to
+ * duration when getStatsForNerds() reports "SSAP, AD", which is YouTube
+ * stitching the ad into the stream server-side. Three layers where this file
+ * has one. Leaving adSlots alone is the honest single-layer answer; matching
+ * uBO would mean adding the response rewrite and the stall recovery, and
+ * measuring both.
+ *
+ * Ad requests are not blocked at all: the declarative rules that did that were
+ * removed in 0.17.0 because they stopped playback outright.
  *
  * WHAT WAS REMOVED, AND WHY
  *
- * Earlier versions added recovery (forcing a player reload when YouTube walled
- * the session), a hidden error screen, a stall notice, a remembered "flagged"
- * state and request shaping. Every one of those was additive complexity that
- * uBO does not have, and every one produced a bug:
+ * Earlier versions added a hidden error screen, a stall notice, a remembered
+ * "flagged" state and request shaping. Each produced a bug:
  *
- *   - recovery called loadVideoById, restarting the whole player load
- *   - the fetch wrapper buffered every player response before releasing it
  *   - the stall notice fired on a timer and appeared over videos that were
  *     merely slow to start
  *   - request shaping made YouTube answer with muteOnStart, silencing playback
- *   - neutralising adBreakHeartbeatParams, a key uBO never touches, stopped
- *     playback entirely for six versions
+ *   - neutralising adBreakHeartbeatParams stopped playback for six versions
  *
- * None of it ever rescued a flagged session either — measured with the bypass
+ * None of it rescued a flagged session either — measured with the bypass
  * switch: with this extension fully disabled the block persisted identically.
- * The block is YouTube's, it is decided server-side, and the honest position is
- * that nothing here changes it. So none of that machinery earns its place.
+ * The block is YouTube's and is decided server-side.
  *
  * Every path is wrapped: any failure leaves the data exactly as it arrived,
  * because a broken YouTube is far worse than an ad.
@@ -50,8 +68,9 @@
 (() => {
   "use strict";
 
-  // Exactly the keys uBO neutralises. Adding a fourth broke playback for six
-  // versions; do not extend this list without measuring playback afterwards.
+  // The keys uBO names. adSlots is listed here but skipped by default — see
+  // neutralise(). Adding a FOURTH key broke playback for six versions; do not
+  // extend this list without measuring playback afterwards.
   const AD_KEYS = ["adPlacements", "adSlots", "playerAds"];
 
   // A player response always carries one of these, so this can only ever act

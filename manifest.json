@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Quiet for YouTube",
-  "version": "0.17.5",
+  "name": "Quite for YouTube",
+  "version": "0.17.6",
   "description": "Cleans up YouTube: skips video ads, and hides feed, sidebar, search and Shorts ad panels.",
   "permissions": [
     "storage"
@@ -37,7 +37,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Quiet for YouTube"
+    "default_title": "Quite for YouTube"
   },
   "icons": {
     "16": "icons/icon16.png",

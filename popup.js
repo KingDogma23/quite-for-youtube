@@ -62,7 +62,7 @@ function render(d) {
   const s = d.session;
   const reached = s.videoAdsSkipped + s.videoAdsSeeked;
   lastReport = [
-    `Quiet for YouTube v${d.version}  (page ${d.url})`,
+    `Quite for YouTube v${d.version}  (page ${d.url})`,
     `all time: ${lt.adsBlocked} ads stopped, ${humanTime(lt.secondsSaved)} saved, ` +
       `${lt.adsSkipped || 0} ads skipped`,
     `on: ${Object.entries(d.settings).filter(([, v]) => v).map(([k]) => k).join(", ") || "nothing"}`,

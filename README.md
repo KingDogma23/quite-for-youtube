@@ -1,4 +1,4 @@
-# Quiet for YouTube
+# Quite for YouTube
 
 A Chrome extension that removes ads from YouTube.
 
