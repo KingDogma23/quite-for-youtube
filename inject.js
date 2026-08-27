@@ -442,6 +442,52 @@
 
   const MEDIA_URL = /\/videoplayback/;
 
+  /**
+   * With the rewrite disabled, OBSERVE the player responses anyway.
+   *
+   * ?ytacnorewrite=1 used to install nothing, so the control arm could not
+   * report what a response carried — and the one thing that separates fast
+   * hops from slow ones so far is whether adSlots was present. A control that
+   * cannot see the suspected cause is not a control; it is a second
+   * uncontrolled session. This reads the body of a CLONE and modifies nothing.
+   */
+  if (noRewrite) {
+    try {
+      const nativeFetch = window.fetch;
+      window.fetch = function (input, init) {
+        const url =
+          typeof input === "string"
+            ? input
+            : (input && (input.url || String(input))) || "";
+        const pending = nativeFetch.apply(this, arguments);
+        if (MEDIA_URL.test(url)) {
+          pending.then(
+            (res) => noteMedia(res.status),
+            () => noteMedia("failed"),
+          );
+        }
+        if (!PLAYER_URL.test(url)) return pending;
+        pending
+          .then((res) => (res && res.status === 200 ? res.clone().text() : null))
+          .then((text) => {
+            if (!text) return;
+            const seen = [];
+            for (const [key, label] of Object.entries(LABELS)) {
+              if (text.indexOf('"' + key + '"') !== -1) seen.push(label);
+            }
+            document.documentElement.setAttribute(
+              "data-ytac-adsched-fetch",
+              seen.length ? seen.join(",") : "none",
+            );
+          })
+          .catch(() => {});
+        return pending;
+      };
+    } catch {
+      /* observation is optional */
+    }
+  }
+
   if (!noRewrite) {
     try {
       const nativeFetch = window.fetch;
