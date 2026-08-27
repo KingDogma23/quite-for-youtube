@@ -147,6 +147,28 @@
     const LOG_MAX = 40;
     const hops = [];
 
+    // Media counts are cumulative, so each hop keeps the reading it started
+    // with and reports the difference.
+    const readMedia = () => {
+      const out = Object.create(null);
+      for (const part of (root.getAttribute("data-ytac-media") || "").split(",")) {
+        const [k, v] = part.split("x");
+        if (k) out[k] = Number(v) || 0;
+      }
+      return out;
+    };
+    let mediaAtHopStart = readMedia();
+
+    const mediaDelta = () => {
+      const now = readMedia();
+      const diff = [];
+      for (const k of Object.keys(now)) {
+        const d = now[k] - (mediaAtHopStart[k] || 0);
+        if (d > 0) diff.push(`${k}x${d}`);
+      }
+      return diff.join(",") || "none";
+    };
+
     const logHop = () => {
       const ls = marks.loadstart;
       const meta = marks.loadedmetadata;
@@ -159,7 +181,10 @@
         gap: meta === undefined ? null : meta - ls,
         play,
         sched: root.getAttribute("data-ytac-adsched-fetch") || "",
-        media: root.getAttribute("data-ytac-media") || "",
+        // What the media layer did during THIS hop. The tally is cumulative
+        // for the session, so a slow hop showed "200x41" — the total since the
+        // page opened, which says nothing about the four seconds in question.
+        media: mediaDelta(),
         hidden: hiddenEver ? 1 : 0,
       });
       if (hops.length > LOG_MAX) hops.shift();
@@ -238,6 +263,7 @@
       marks = Object.create(null);
       navBase = performance.now();
       navCount++;
+      mediaAtHopStart = readMedia();
       // Visibility is judged PER VIDEO, not per document. The flag used to
       // latch for the life of the page, so one glance at another tab marked
       // every subsequent hop void — in a clicking session that is every

@@ -517,6 +517,14 @@
 
       XMLHttpRequest.prototype.send = function () {
         try {
+          // Media over XHR was not being counted at all, so a media failure on
+          // that path looked like a clean session. A tally with a hole in it is
+          // worse than no tally: it reads as evidence of absence.
+          if (MEDIA_URL.test(this.__ytacUrl || "")) {
+            this.addEventListener("loadend", function () {
+              noteMedia(this.status || "failed");
+            });
+          }
           if (PLAYER_URL.test(this.__ytacUrl || "")) {
             this.addEventListener("readystatechange", function () {
               if (this.readyState !== 4) return;
