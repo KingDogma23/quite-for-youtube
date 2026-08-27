@@ -20,6 +20,7 @@ BOLD=$'\033[1m'; DIM=$'\033[2m'; RED=$'\033[31m'; YEL=$'\033[33m'; GRN=$'\033[32
 EXCLUDE=(
   ".git" ".github" ".gitignore" ".DS_Store"
   "dist" "test" "tests" "node_modules"
+  "store"   # submission paperwork, not part of the extension
   "package.sh"
 )
 
