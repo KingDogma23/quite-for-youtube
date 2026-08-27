@@ -28,6 +28,14 @@ html:not([data-ytac-feed-off]) ytd-watch-next-secondary-results-renderer ytd-ad-
 html:not([data-ytac-feed-off]) #related ytd-ad-slot-renderer,
 html:not([data-ytac-feed-off]) #panels ytd-ad-slot-renderer,
 html:not([data-ytac-feed-off]) ytd-engagement-panel-section-list-renderer:has(ytd-ad-slot-renderer),
+/* The ads engagement panel names itself, and holds no ad-slot-renderer, so
+   the :has() rule above never matched it. Seen rendering as a Sponsored
+   block UNDER the player at narrow widths, where the sidebar collapses
+   into the main column. Matching on target-id is safe: the other panels
+   carry their own ids (comments-section, structured-description,
+   clip-create) and none of them are ads. */
+html:not([data-ytac-feed-off]) ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"],
+html:not([data-ytac-feed-off]) ytd-ads-engagement-panel-content-renderer,
 html:not([data-ytac-feed-off]) ytd-compact-video-renderer:has(ytd-ad-slot-renderer),
 
 /* --- the ad element itself, as a backstop --- */
