@@ -109,6 +109,9 @@
     const at = () => Math.round(performance.now() - navBase);
     let hiddenEver = document.visibilityState === "hidden";
 
+    const videoId = () =>
+      (location.search.match(/[?&]v=([\w-]{11})/) || [])[1] || "?";
+
     const publish = () => {
       try {
         root.setAttribute(
@@ -139,8 +142,6 @@
     let slowCount = 0;
     const SLOW_MS = 3000;
 
-    const videoId = () => (location.search.match(/[?&]v=([\w-]{11})/) || [])[1] || "?";
-
     const mark = (name) => {
       if (name in marks) return; // first occurrence only
       marks[name] = at();
@@ -160,7 +161,17 @@
 
     // YouTube announces its own soft navigations. Re-arm on them, so each
     // video is timed from the moment it was asked for.
+    //
+    // Keyed on the video CHANGING, not on the event firing. YouTube emits
+    // yt-navigate-finish during its own boot, after the media events for the
+    // cold load have already been recorded — re-arming blindly wiped them, and
+    // four of six measured loads came back empty. An event is not evidence
+    // that the thing it is named after actually happened.
+    let currentId = videoId();
     const rearm = () => {
+      const id = videoId();
+      if (id === currentId) return;
+      currentId = id;
       marks = Object.create(null);
       navBase = performance.now();
       navCount++;
