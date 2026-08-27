@@ -358,6 +358,72 @@
     return text.replace(AD_KEY_RE, '"no_ads"');
   }
 
+  // ------------------------------------------------- client identity, on retry
+  //
+  // The half of uBO's recovery that this file was missing. Their watcher does
+  // not merely call loadVideoById; before it does, it rewrites
+  // ytcfg.data_.INNERTUBE_CONTEXT.client.userAgent to carry a marker, and a
+  // companion rule then sets clientScreen "CHANNEL" on the outgoing /player
+  // request whenever that marker is present:
+  //
+  //   trusted-json-edit-xhr-request,
+  //     [?..userAgent*="channel"]..client[?.clientName=="WEB"]+={"clientScreen":"CHANNEL"}
+  //
+  // Measured here without it (0.20.0): a slot-carrying cold load took two
+  // reload attempts and 10-15 seconds, because the first retry asked with the
+  // same identity and was answered the same way. Retrying identically is not
+  // a retry.
+  //
+  // This is request shaping, which has burned this extension before — an
+  // earlier version reshaped EVERY player request and YouTube answered with
+  // muteOnStart, silencing playback. The difference that makes it safe here:
+  // nothing is shaped until a stall has already been detected, so a normal
+  // load is byte-for-byte what YouTube expects.
+  const IDENTITY_MARKERS = ["channel", "lactmilli"];
+  let identityMarker = null;
+  let originalUserAgent = null;
+  let requestEdits = 0;
+
+  function rotateIdentity(marker) {
+    try {
+      const context =
+        window.ytcfg && window.ytcfg.data_ && window.ytcfg.data_.INNERTUBE_CONTEXT;
+      if (!context || !context.client) return false;
+      if (originalUserAgent === null) originalUserAgent = context.client.userAgent || "";
+      identityMarker = marker;
+      context.client.userAgent = marker
+        ? originalUserAgent.replace(/(Mozilla\/5\.0 \([^)]+)/, "$1; " + marker)
+        : originalUserAgent;
+      document.documentElement.setAttribute("data-ytac-identity", marker || "original");
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Returns an edited request body, or null to send it untouched. */
+  function editRequestBody(text) {
+    // Only ever acts while a marker is set, which only happens after a stall.
+    if (!identityMarker || typeof text !== "string") return null;
+    if (text.indexOf(identityMarker) === -1) return null;
+    try {
+      const data = JSON.parse(text);
+      const client = data && data.context && data.context.client;
+      if (!client || client.clientName !== "WEB") return null;
+      if (client.clientScreen === "CHANNEL") return null;
+      client.clientScreen = "CHANNEL";
+      requestEdits++;
+      try {
+        document.documentElement.setAttribute("data-ytac-reqedits", String(requestEdits));
+      } catch {
+        /* reporting only */
+      }
+      return JSON.stringify(data);
+    } catch {
+      return null;
+    }
+  }
+
   if (!noRewrite) {
     try {
       const nativeFetch = window.fetch;
@@ -366,7 +432,11 @@
           typeof input === "string"
             ? input
             : (input && (input.url || String(input))) || "";
-        const pending = nativeFetch.apply(this, arguments);
+        if (PLAYER_URL.test(url) && init && typeof init.body === "string") {
+          const edited = editRequestBody(init.body);
+          if (edited) init = { ...init, body: edited };
+        }
+        const pending = nativeFetch.apply(this, [input, init]);
         if (!PLAYER_URL.test(url)) return pending;
 
         return pending.then((res) => {
@@ -413,9 +483,15 @@
         return nativeOpen.apply(this, arguments);
       };
 
-      XMLHttpRequest.prototype.send = function () {
+      XMLHttpRequest.prototype.send = function (body) {
         try {
           if (PLAYER_URL.test(this.__ytacUrl || "")) {
+            // uBO applies its request edit on the XHR path specifically.
+            const edited = editRequestBody(body);
+            if (edited) {
+              // eslint-disable-next-line no-param-reassign
+              arguments[0] = edited;
+            }
             this.addEventListener("readystatechange", function () {
               if (this.readyState !== 4) return;
               try {
@@ -547,8 +623,14 @@
           response.playerConfig.playbackStartConfig &&
           response.playerConfig.playbackStartConfig.startSeconds) ||
         0;
+      // Rotate before reloading, so the retry asks as a different client.
+      // Without this the second request is identical to the first, and so is
+      // the answer.
+      const marker = IDENTITY_MARKERS[Math.min(recoveries, IDENTITY_MARKERS.length - 1)];
+      rotateIdentity(marker);
+
       recoveries++;
-      publishRecovery("reloading");
+      publishRecovery("reloading:" + marker);
       player.loadVideoById(videoId, start);
     } catch {
       publishRecovery("failed");
