@@ -1,8 +1,7 @@
 /**
  * Quite for YouTube — page-world ad neutralisation.
  *
- * Three layers. The first two cover different paths, and only one of them can
- * apply on any given load; the third catches what the second cannot fix.
+ * Two layers, covering different paths. Only one can apply on any given load.
  *
  *   1. RESPONSE REWRITE — for player responses that arrive over fetch or XHR,
  *      which is every video opened from inside YouTube. The ad keys are
@@ -21,12 +20,22 @@
  *      retry (0.20.1) rescues it — both were tried and measured. Those ads
  *      play and are skipped by content.js. See neutralise().
  *
- *   3. STALL RECOVERY — a safety net, at the end of this file. When the
- *      player has nothing loaded AND reports a dead buffer at 0x0, it is
- *      reloaded, under a rotated client identity. It does NOT rescue the
- *      adSlots stall, which is why layer 2 leaves that key alone; it is kept
- *      because a reload is the right response to a player that has nothing,
- *      and it costs nothing when nothing is wrong.
+ * THERE IS NO STALL RECOVERY, AND THAT IS THE FIX
+ *
+ * 0.19.0 added one: on a dead buffer at 0x0 it reloaded the player, later
+ * under a rotated client identity. It was added because uBO appeared to have
+ * one. Measured on 2026-08-27, on a two-hour stream replay carrying 54 ad
+ * placements, tab visible throughout:
+ *
+ *   recovery enabled    4 loads, 3 played, 1 fired the recovery — and that
+ *                       one showed YouTube's "This content isn't available"
+ *                       screen with the player dead at readyState 0
+ *   recovery disabled   4 loads, 4 played, no error screen
+ *
+ * In eight versions it was never once observed rescuing a load. The error
+ * screen reported from 0.19.0 onward was this. Removed entirely, along with
+ * the identity rotation and the request editing that existed only to serve
+ * it — about 200 lines.
  *
  * google_ad_status is also set, and is close to pointless: YouTube sets it to
  * 1 itself, measured with ?ytacnostatus=1.
@@ -52,19 +61,15 @@
  *      rotated client userAgent. That stall signature is the one measured
  *      here: media never arrives and the player sits at readyState 0.
  *
- * So uBO does neutralise adSlots on www.youtube.com, and it evidently hits the
- * same wall, because it ships a dedicated recovery for it — plus a seek to
- * duration when getStatsForNerds() reports "SSAP, AD", which is YouTube
- * stitching the ad into the stream server-side. This file has the response
- * rewrite (0.18.0), the stall recovery (0.19.0) and the client-identity retry
- * (0.20.1), and not the SSAP seek.
+ * So uBO does neutralise adSlots on www.youtube.com. Copying its layers did
+ * NOT buy its behaviour: the recovery was measured causing an error screen and
+ * never seen rescuing anything, and the identity retry did not help either.
+ * Both are gone. What is left is the response rewrite (0.18.0) and the global
+ * neutralisation, which are the two things with measurements behind them.
  *
- * Copying two of uBO's layers did NOT buy uBO's behaviour. Removing adSlots on
- * the cold path with both of them in place was measured on 2026-08-27 and the
- * player still died — see neutralise(). Something else in what uBO does is
- * load-bearing, and guessing at which piece has now cost two attempts. The
- * next move is reading how their recovery actually behaves on a stalled
- * SSAP load, not adding a fourth thing that sounds plausible.
+ * uBO's live rules were also read in a profile where its Quick Fixes list —
+ * the one carrying that recovery scriptlet — was not even enabled. Three
+ * versions were built on a rule that was not running.
  *
  * Ad requests are not blocked at all: the declarative rules that did that were
  * removed in 0.17.0 because they stopped playback outright.
@@ -390,72 +395,6 @@
     return text.replace(AD_KEY_RE, '"no_ads"');
   }
 
-  // ------------------------------------------------- client identity, on retry
-  //
-  // The half of uBO's recovery that this file was missing. Their watcher does
-  // not merely call loadVideoById; before it does, it rewrites
-  // ytcfg.data_.INNERTUBE_CONTEXT.client.userAgent to carry a marker, and a
-  // companion rule then sets clientScreen "CHANNEL" on the outgoing /player
-  // request whenever that marker is present:
-  //
-  //   trusted-json-edit-xhr-request,
-  //     [?..userAgent*="channel"]..client[?.clientName=="WEB"]+={"clientScreen":"CHANNEL"}
-  //
-  // Measured here without it (0.20.0): a slot-carrying cold load took two
-  // reload attempts and 10-15 seconds, because the first retry asked with the
-  // same identity and was answered the same way. Retrying identically is not
-  // a retry.
-  //
-  // This is request shaping, which has burned this extension before — an
-  // earlier version reshaped EVERY player request and YouTube answered with
-  // muteOnStart, silencing playback. The difference that makes it safe here:
-  // nothing is shaped until a stall has already been detected, so a normal
-  // load is byte-for-byte what YouTube expects.
-  const IDENTITY_MARKERS = ["channel", "lactmilli"];
-  let identityMarker = null;
-  let originalUserAgent = null;
-  let requestEdits = 0;
-
-  function rotateIdentity(marker) {
-    try {
-      const context =
-        window.ytcfg && window.ytcfg.data_ && window.ytcfg.data_.INNERTUBE_CONTEXT;
-      if (!context || !context.client) return false;
-      if (originalUserAgent === null) originalUserAgent = context.client.userAgent || "";
-      identityMarker = marker;
-      context.client.userAgent = marker
-        ? originalUserAgent.replace(/(Mozilla\/5\.0 \([^)]+)/, "$1; " + marker)
-        : originalUserAgent;
-      document.documentElement.setAttribute("data-ytac-identity", marker || "original");
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /** Returns an edited request body, or null to send it untouched. */
-  function editRequestBody(text) {
-    // Only ever acts while a marker is set, which only happens after a stall.
-    if (!identityMarker || typeof text !== "string") return null;
-    if (text.indexOf(identityMarker) === -1) return null;
-    try {
-      const data = JSON.parse(text);
-      const client = data && data.context && data.context.client;
-      if (!client || client.clientName !== "WEB") return null;
-      if (client.clientScreen === "CHANNEL") return null;
-      client.clientScreen = "CHANNEL";
-      requestEdits++;
-      try {
-        document.documentElement.setAttribute("data-ytac-reqedits", String(requestEdits));
-      } catch {
-        /* reporting only */
-      }
-      return JSON.stringify(data);
-    } catch {
-      return null;
-    }
-  }
-
   if (!noRewrite) {
     try {
       const nativeFetch = window.fetch;
@@ -464,11 +403,7 @@
           typeof input === "string"
             ? input
             : (input && (input.url || String(input))) || "";
-        if (PLAYER_URL.test(url) && init && typeof init.body === "string") {
-          const edited = editRequestBody(init.body);
-          if (edited) init = { ...init, body: edited };
-        }
-        const pending = nativeFetch.apply(this, [input, init]);
+        const pending = nativeFetch.apply(this, arguments);
         if (!PLAYER_URL.test(url)) return pending;
 
         return pending.then((res) => {
@@ -525,15 +460,9 @@
         return nativeOpen.apply(this, arguments);
       };
 
-      XMLHttpRequest.prototype.send = function (body) {
+      XMLHttpRequest.prototype.send = function () {
         try {
           if (PLAYER_URL.test(this.__ytacUrl || "")) {
-            // uBO applies its request edit on the XHR path specifically.
-            const edited = editRequestBody(body);
-            if (edited) {
-              // eslint-disable-next-line no-param-reassign
-              arguments[0] = edited;
-            }
             this.addEventListener("readystatechange", function () {
               if (this.readyState !== 4) return;
               try {
@@ -588,145 +517,6 @@
   } else {
     try {
       document.documentElement.setAttribute("data-ytac-nostatus", "1");
-    } catch {
-      /* reporting only */
-    }
-  }
-
-  // ------------------------------------------------------- stall recovery
-  //
-  // uBO's third layer, and the reason it can afford to remove adSlots outright
-  // where this extension cannot. quick-fixes.txt watches getStatsForNerds()
-  // and, on buffer_health_seconds "0.00 s" with resolution "0x0", calls
-  // loadVideoById to retry the load.
-  //
-  // Why a retry helps rather than repeating the same failure: the stall only
-  // happens on a COLD load, where the player response was embedded in the page
-  // HTML and no request existed to rewrite. loadVideoById makes the player
-  // FETCH a fresh player response — which the rewrite above does clean. So the
-  // retry does not repeat the failing path, it moves onto the working one.
-  //
-  // Three guards, because reloading a video that is merely slow would be worse
-  // than the bug:
-  //
-  //   - two independent signals must agree: the media element reports nothing
-  //     loaded AND the player's own stats report a dead buffer at 0x0
-  //   - the condition must hold for SETTLE_SAMPLES consecutive seconds, so a
-  //     video that is starting normally is never touched
-  //   - at most MAX_RECOVERIES attempts, and only in the first WINDOW_MS after
-  //     load, after which a stall is someone else's problem
-  const MAX_RECOVERIES = 2;
-  const SETTLE_SAMPLES = 4; // seconds of agreement before acting
-  const WINDOW_MS = 45000;
-
-  let recoveries = 0;
-  let stalledFor = 0;
-
-  function publishRecovery(note) {
-    try {
-      document.documentElement.setAttribute(
-        "data-ytac-recovered",
-        `${recoveries}${note ? "," + note : ""}`,
-      );
-    } catch {
-      /* reporting only */
-    }
-  }
-
-  /** Both signals must agree, and neither is trusted on its own. */
-  function isStalled(player, video) {
-    if (!player || !video) return false;
-    // Signal one: the media element has nothing and is not merely paused.
-    if (video.readyState > 0 || video.currentTime > 0 || video.paused) return false;
-    // Signal two: the player's own diagnostics.
-    let stats = null;
-    try {
-      stats = player.getStatsForNerds ? player.getStatsForNerds() : null;
-    } catch {
-      return false;
-    }
-    if (!stats) return false;
-    return (
-      String(stats.buffer_health_seconds || "").indexOf("0.00") === 0 &&
-      String(stats.resolution || "").indexOf("0x0") !== -1
-    );
-  }
-
-  function recover(player) {
-    try {
-      const response = player.getPlayerResponse ? player.getPlayerResponse() : null;
-      const videoId = response && response.videoDetails && response.videoDetails.videoId;
-      if (!videoId || typeof player.loadVideoById !== "function") {
-        publishRecovery("no-api");
-        return;
-      }
-      const start =
-        (response.playerConfig &&
-          response.playerConfig.playbackStartConfig &&
-          response.playerConfig.playbackStartConfig.startSeconds) ||
-        0;
-      // Rotate before reloading, so the retry asks as a different client.
-      // Without this the second request is identical to the first, and so is
-      // the answer.
-      const marker = IDENTITY_MARKERS[Math.min(recoveries, IDENTITY_MARKERS.length - 1)];
-      rotateIdentity(marker);
-
-      recoveries++;
-      publishRecovery("reloading:" + marker);
-      player.loadVideoById(videoId, start);
-    } catch {
-      publishRecovery("failed");
-    }
-  }
-
-  if (location.search.indexOf("ytacnorecover=1") === -1) {
-    const startWatch = () => {
-      const began = performance.now();
-      const timer = setInterval(() => {
-        try {
-          if (recoveries >= MAX_RECOVERIES || performance.now() - began > WINDOW_MS) {
-            clearInterval(timer);
-            return;
-          }
-          // Never reload a backgrounded tab.
-          //
-          // One of the two stall signals is the player reporting 0x0
-          // resolution, and a hidden tab can report that for entirely innocent
-          // reasons — nothing is being composited. Someone listening to a
-          // video in another tab must not have it restarted underneath them.
-          // The counter resets too, so a tab that was hidden for a while does
-          // not act the instant it becomes visible.
-          if (document.visibilityState === "hidden") {
-            stalledFor = 0;
-            return;
-          }
-
-          const player = document.getElementById("movie_player");
-          const video = player && player.querySelector("video");
-          if (!isStalled(player, video)) {
-            stalledFor = 0;
-            return;
-          }
-          stalledFor++;
-          if (stalledFor >= SETTLE_SAMPLES) {
-            stalledFor = 0;
-            recover(player);
-          }
-        } catch {
-          /* a broken watcher must never break playback */
-        }
-      }, 1000);
-    };
-
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", startWatch, { once: true });
-    } else {
-      startWatch();
-    }
-    publishRecovery();
-  } else {
-    try {
-      document.documentElement.setAttribute("data-ytac-norecover", "1");
     } catch {
       /* reporting only */
     }
