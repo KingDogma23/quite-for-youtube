@@ -16,10 +16,11 @@
  *        set-constant  ytInitialPlayerResponse.playerAds     undefined
  *        set-constant  playerResponse.adPlacements           undefined
  *
- *      adSlots is left ALONE on this path. Taking it away here — as a getter
- *      or by deleting the key, both measured — stops the player ever
- *      receiving media. Those ads play and are skipped by content.js instead.
- *      See neutralise() for the numbers.
+ *        set-constant  ytInitialPlayerResponse.adSlots       undefined
+ *
+ *      adSlots on this path stalled the player badly enough to ship without
+ *      it in 0.17.5. It is back as of 0.20.0 because layer 3 gives the stall
+ *      an exit. See neutralise() for the numbers and the way back out.
  *
  *   3. STALL RECOVERY — the safety net under both, at the end of this file.
  *      When the player has nothing loaded AND reports a dead buffer at 0x0,
@@ -122,11 +123,11 @@
 
   // Which shape adSlots is given. Diagnostic switch; see neutralise().
   const slotsMode =
-    (location.search.match(/[?&]ytacslots=(keep|delete|undef)/) || [])[1] || "keep";
+    (location.search.match(/[?&]ytacslots=(keep|delete|undef)/) || [])[1] || "undef";
   try {
-    if (slotsMode !== "keep") {
-      document.documentElement.setAttribute("data-ytac-slots", slotsMode);
-    }
+    // Always stamped, not only when overridden: which mode ran is the first
+    // thing any reading about a stall needs to say.
+    document.documentElement.setAttribute("data-ytac-slots", slotsMode);
   } catch {
     /* reporting only */
   }
@@ -169,31 +170,33 @@
     for (const key of AD_KEYS) {
       if (!(key in payload)) continue;
 
-      // adSlots is LEFT ALONE, and that is the whole fix for the hang.
+      // adSlots IS removed here, and the stall recovery is what makes that
+      // affordable. This is the same call uBO makes, in the same order.
       //
-      // Measured on 2026-08-26, cold loads of never-visited videos, first
-      // frame taken from the page's own media events:
+      // Measured 2026-08-27, cold loads of never-visited videos, first frame
+      // from the page's own media events:
       //
       //   adSlots -> getter undefined   n=14   0 fast, 6 slow (5-10s), 8 never
       //   adSlots -> deleted            n=7    0 fast, 3 slow,          4 never
-      //   adSlots -> untouched          n=4    all fast (~1.5s)
-      //   no adSlots in the response    n=20+  all fast, ads gone
+      //   adSlots -> untouched          n=4    all fast (~1.5s), ad plays
       //
-      // The guess that got tested here was that the SHAPE of the edit was
-      // wrong — that a getter leaves the key present so `"adSlots" in r`
-      // still passes, where uBO's json-prune deletes it and that guard skips.
-      // Deleting the key measured the same as the getter. The shape is not
-      // what matters; removing the schedule at all is.
+      // Those failures are why 0.17.5 shipped with adSlots untouched. What
+      // changed is not the risk but the response to it: 0.19.0 added the stall
+      // recovery, which reloads the player, and a reload FETCHES the player
+      // response, which the rewrite above renames cleanly. So the failing path
+      // now has an exit, and taking it costs about four seconds.
       //
-      // What is left is a plain statement of fact: on videos where YouTube
-      // fills ad SLOTS, taking the slots away stops the player getting media.
-      // Those ads are handled the way this extension handles any ad that
-      // actually plays — the skip loop in content.js. Everything else still
-      // has its schedule neutralised, which is where the ads really do vanish.
+      // Recovery observed doing exactly that, 3 of 3, ending with no_ads in
+      // the player's own response. What has NOT been observed is recovery
+      // rescuing the permanent version of the failure, because that stopped
+      // reproducing before it could be tested. If a stalled player is ever
+      // seen sitting past the recovery window, ?ytacslots=keep is the setting
+      // that trades ads-removed back for ads-skipped, and this default is what
+      // should be reconsidered first.
       //
-      //   (default)           leave adSlots untouched
-      //   ?ytacslots=delete   delete the key, as json-prune does
-      //   ?ytacslots=undef    the getter this shipped with, for re-testing
+      //   (default)           undefined, as uBO does
+      //   ?ytacslots=delete   delete the key outright
+      //   ?ytacslots=keep     leave it alone; the ad plays and is skipped
       if (key === "adSlots") {
         if (slotsMode === "keep") continue;
         if (slotsMode === "delete") {
