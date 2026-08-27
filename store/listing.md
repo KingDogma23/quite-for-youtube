@@ -67,8 +67,15 @@ Select: **does not collect or use user data.**
 - No data used for creditworthiness or lending
 - Not used for purposes unrelated to the single purpose above
 
-## Assets still required
+## Assets
 
-- Screenshots, 1280x800 or 640x400, at least one, up to five
-- Optional 440x280 small promo tile
+- Screenshots, 1280x800, in `store/screenshots/`:
+  - `01-ads-out-of-youtube.png`
+  - `02-no-account-no-tracking.png`
 - 128x128 icon — already in the package
+- Optional 440x280 small promo tile — not made
+
+The screenshots show the real popup, rendered from the shipped popup.html with
+the extension's own default options ticked. The counters read zero because
+that is what a fresh install shows; inventing numbers for a store listing
+would be a lie told to everyone who reads it.
