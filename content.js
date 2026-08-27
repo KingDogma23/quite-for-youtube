@@ -210,7 +210,14 @@
       document.addEventListener(
         "timeupdate",
         (e) => {
-          if (e.target && e.target.currentTime > 0) mark("advancing");
+          if (!e.target || !(e.target.currentTime > 0)) return;
+          // The video being LEFT keeps firing timeupdate for a moment after a
+          // soft navigation re-arms the clock, so "advancing" was being marked
+          // at ~20ms — before the new video had even issued loadstart. That
+          // made the worst-case tracker read 2071ms through a spin the viewer
+          // sat and watched. A hop has not advanced until it has loaded.
+          if (!("loadstart" in marks) && !("loadedmetadata" in marks)) return;
+          mark("advancing");
         },
         true,
       );
