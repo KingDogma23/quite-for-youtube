@@ -37,6 +37,45 @@
   const VERSION = chrome.runtime.getManifest().version;
 
   /**
+   * Orphan guard. The Facebook build has had this since 2.4.1; this one never
+   * did, and that is the whole reason its card in chrome://extensions shows an
+   * Errors button while Facebook's does not.
+   *
+   * Pressing Reload on an unpacked extension does NOT stop the content script
+   * already running in open tabs. It keeps its timers and keeps calling
+   * chrome.* against a context that no longer exists — here, a storage write
+   * every five seconds, forever, each one throwing "Extension context
+   * invalidated". During a day of reloading, that is thousands of errors from
+   * an extension that is otherwise working perfectly.
+   *
+   * So: every chrome.* call is guarded, and an orphaned script stands down
+   * rather than shouting into a dead channel.
+   */
+  function contextAlive() {
+    try {
+      return !!(chrome.runtime && chrome.runtime.id);
+    } catch {
+      return false;
+    }
+  }
+
+  let timers = [];
+  let stopped = false;
+
+  function shutdown() {
+    if (stopped) return;
+    stopped = true;
+    for (const t of timers) clearInterval(t);
+    timers = [];
+    try {
+      badgeEl?.remove();
+      badgeEl = null;
+    } catch {
+      /* the page is not ours to break on the way out */
+    }
+  }
+
+  /**
    * Time-to-first-frame, measured by the page rather than by polling from
    * outside it.
    *
@@ -201,7 +240,9 @@
   let lifetimeDirty = false;
 
   function loadLifetime() {
+    if (!contextAlive()) return;
     chrome.storage.local.get({ [LIFETIME_KEY]: null }, (got) => {
+      if (chrome.runtime.lastError) return;
       const stored = got[LIFETIME_KEY];
       if (stored) lifetime = { ...lifetime, ...stored };
       if (!lifetime.since) {
@@ -221,11 +262,18 @@
   }
 
   // Batched: writing on every ad would hammer storage during a long session.
-  setInterval(() => {
-    if (!lifetimeDirty) return;
-    lifetimeDirty = false;
-    chrome.storage.local.set({ [LIFETIME_KEY]: lifetime });
-  }, 5000);
+  timers.push(
+    setInterval(() => {
+      if (!contextAlive()) return shutdown();
+      if (!lifetimeDirty) return;
+      lifetimeDirty = false;
+      try {
+        chrome.storage.local.set({ [LIFETIME_KEY]: lifetime });
+      } catch {
+        shutdown();
+      }
+    }, 5000),
+  );
 
   const session = {
     videoAdsSkipped: 0,
@@ -552,6 +600,8 @@
   // ------------------------------------------------------------------- loop
 
   function tick() {
+    if (stopped) return;
+    if (!contextAlive()) return shutdown();
     // The player loop must not run during a bypass either: it clicks, seeks
     // and changes playbackRate, none of which a control arm may do.
     if (!settings.enabled || location.search.indexOf("ytacoff=1") !== -1) return;
@@ -599,12 +649,13 @@
     // callback would run querySelectors — the same reflow-storm pattern that
     // made the Facebook build flicker. It buys nothing here: the stylesheet
     // hides feed ads with no JS at all, and player state is polled anyway.
-    setInterval(tick, 400);
+    timers.push(setInterval(tick, 400));
   }
 
   loadLifetime();
 
   chrome.storage.sync.get(DEFAULTS, (stored) => {
+    if (chrome.runtime.lastError) return;
     settings = { ...DEFAULTS, ...stored };
     applyCssToggles();
     if (document.body) start();
