@@ -159,6 +159,7 @@
         gap: meta === undefined ? null : meta - ls,
         play,
         sched: root.getAttribute("data-ytac-adsched-fetch") || "",
+        media: root.getAttribute("data-ytac-media") || "",
         hidden: hiddenEver ? 1 : 0,
       });
       if (hops.length > LOG_MAX) hops.shift();
@@ -168,7 +169,10 @@
           "data-ytac-hops",
           hops
             .slice(-12)
-            .map((h) => `${h.n}:${h.id}:${h.play}ms:gap${h.gap}:${h.sched}:h${h.hidden}`)
+            .map(
+              (h) =>
+                `${h.n}:${h.id}:${h.play}ms:gap${h.gap}:${h.sched}:${h.media}:h${h.hidden}`,
+            )
             .join(" | "),
         );
       } catch {

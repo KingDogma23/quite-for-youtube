@@ -412,6 +412,36 @@
     return text.replace(AD_KEY_RE, '"no_ads"');
   }
 
+  /**
+   * Record how the MEDIA requests fared, not just the player response.
+   *
+   * A hop measured on 2026-08-27 sat 11.5 seconds between loadstart and
+   * loadedmetadata — the player asked for media and got nothing back. The one
+   * time a stall was traced at the network layer, videoplayback answered 503.
+   * That was a single observation and has never been repeated, because
+   * catching it requires watching the network at the exact moment it happens.
+   *
+   * So the page keeps the tally itself: status codes for videoplayback, by
+   * count. Bodies are never read and nothing is modified — this only observes.
+   */
+  const mediaStatus = Object.create(null);
+
+  function noteMedia(status) {
+    try {
+      mediaStatus[status] = (mediaStatus[status] || 0) + 1;
+      document.documentElement.setAttribute(
+        "data-ytac-media",
+        Object.keys(mediaStatus)
+          .map((k) => `${k}x${mediaStatus[k]}`)
+          .join(","),
+      );
+    } catch {
+      /* reporting only */
+    }
+  }
+
+  const MEDIA_URL = /\/videoplayback/;
+
   if (!noRewrite) {
     try {
       const nativeFetch = window.fetch;
@@ -421,6 +451,14 @@
             ? input
             : (input && (input.url || String(input))) || "";
         const pending = nativeFetch.apply(this, arguments);
+
+        if (MEDIA_URL.test(url)) {
+          pending.then(
+            (res) => noteMedia(res.status),
+            () => noteMedia("failed"),
+          );
+        }
+
         if (!PLAYER_URL.test(url)) return pending;
 
         return pending.then((res) => {
