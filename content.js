@@ -140,6 +140,12 @@
       marks = Object.create(null);
       navBase = performance.now();
       navCount++;
+      // Visibility is judged PER VIDEO, not per document. The flag used to
+      // latch for the life of the page, so one glance at another tab marked
+      // every subsequent hop void — in a clicking session that is every
+      // reading after the first. What matters is whether THIS video was
+      // watched in the open.
+      hiddenEver = document.visibilityState === "hidden";
       publish();
     };
     for (const evt of ["yt-navigate-start", "yt-navigate-finish"]) {
