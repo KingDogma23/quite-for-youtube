@@ -185,7 +185,7 @@
         // for the session, so a slow hop showed "200x41" — the total since the
         // page opened, which says nothing about the four seconds in question.
         media: mediaDelta(),
-        stalls: stalls ? `stall${stalls}/${stallWorst}ms` : "",
+        stalls: `${stalls ? `stall${stalls}/${stallWorst}ms` : ""}${resets ? `reset${resets}@${resetAt}ms` : ""}`,
         hidden: hiddenEver ? 1 : 0,
       });
       if (hops.length > LOG_MAX) hops.shift();
@@ -223,12 +223,18 @@
     let stalls = 0;
     let stallWorst = 0;
     let stallTotal = 0;
+    // A RESET is the failure actually observed: the player starts, then tears
+    // the media down and returns to currentTime 0 with an empty buffer. It is
+    // not rebuffering — the stall counter missed it because that counter
+    // required currentTime > 0, and a reset puts currentTime back to zero.
+    let resets = 0;
+    let resetAt = 0;
 
     const publishStalls = () => {
       try {
         root.setAttribute(
           "data-ytac-rebuffer",
-          `n=${stalls},worst=${stallWorst}ms,total=${stallTotal}ms`,
+          `n=${stalls},worst=${stallWorst}ms,total=${stallTotal}ms,resets=${resets}`,
         );
       } catch {
         /* reporting only */
@@ -298,6 +304,8 @@
       stalls = 0;
       stallWorst = 0;
       stallTotal = 0;
+      resets = 0;
+      resetAt = 0;
       publishStalls();
       // Visibility is judged PER VIDEO, not per document. The flag used to
       // latch for the life of the page, so one glance at another tab marked
@@ -330,12 +338,26 @@
         document.addEventListener(type, () => mark(type), true);
       }
 
+      document.addEventListener(
+        "loadstart",
+        () => {
+          // Same video, already playing, and the media layer starts over.
+          if (marks.playing === undefined) return;
+          resets++;
+          resetAt = at();
+          publishStalls();
+        },
+        true,
+      );
+
       // A stall only counts once playback has actually begun; "waiting" also
       // fires during a normal cold start, which is measured separately above.
       document.addEventListener(
         "waiting",
-        (e) => {
-          if (!e.target || !(e.target.currentTime > 0)) return;
+        () => {
+          // Gated on playback having begun, not on currentTime — a reset puts
+          // currentTime back to 0, which is exactly when this must still fire.
+          if (marks.playing === undefined) return;
           if (stallStart === null) stallStart = performance.now();
         },
         true,
