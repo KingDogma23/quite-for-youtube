@@ -1,19 +1,28 @@
 /**
  * Quite for YouTube — page-world ad neutralisation.
  *
- * Deliberately minimal. This does what uBlock Origin's live YouTube rules do,
- * and nothing else:
+ * Two layers, because they cover different paths and only one of them can
+ * apply on any given load.
  *
- *   set-constant  ytInitialPlayerResponse.adPlacements  undefined
- *   set-constant  ytInitialPlayerResponse.playerAds     undefined
- *   set-constant  playerResponse.adPlacements           undefined
- *   set-constant  google_ad_status                      1
+ *   1. RESPONSE REWRITE — for player responses that arrive over fetch or XHR,
+ *      which is every video opened from inside YouTube. The ad keys are
+ *      RENAMED in the body before the page parses it, so they never exist.
+ *      This removes the ad outright, adSlots included, with no stall.
  *
- * adSlots is deliberately NOT in that list here, though uBO does name it.
- * Neutralising it — as a getter or by deleting the key, both were measured —
- * stops the player ever receiving media on videos that carry slots. See
- * neutralise() for the numbers. google_ad_status is also close to pointless:
- * YouTube sets it to 1 itself, measured with ?ytacnostatus=1.
+ *   2. GLOBAL NEUTRALISATION — for a cold page load, where YouTube embeds the
+ *      player response in the HTML and there is no request to rewrite:
+ *
+ *        set-constant  ytInitialPlayerResponse.adPlacements  undefined
+ *        set-constant  ytInitialPlayerResponse.playerAds     undefined
+ *        set-constant  playerResponse.adPlacements           undefined
+ *
+ *      adSlots is left ALONE on this path. Taking it away here — as a getter
+ *      or by deleting the key, both measured — stops the player ever
+ *      receiving media. Those ads play and are skipped by content.js instead.
+ *      See neutralise() for the numbers.
+ *
+ * google_ad_status is also set, and is close to pointless: YouTube sets it to
+ * 1 itself, measured with ?ytacnostatus=1.
  *
  * TWO THINGS THIS FILE USED TO CLAIM ABOUT uBO, BOTH FALSE
  *
@@ -39,10 +48,10 @@
  * So uBO does neutralise adSlots on www.youtube.com, and it evidently hits the
  * same wall, because it ships a dedicated recovery for it — plus a seek to
  * duration when getStatsForNerds() reports "SSAP, AD", which is YouTube
- * stitching the ad into the stream server-side. Three layers where this file
- * has one. Leaving adSlots alone is the honest single-layer answer; matching
- * uBO would mean adding the response rewrite and the stall recovery, and
- * measuring both.
+ * stitching the ad into the stream server-side. Of uBO's three layers this
+ * file now has two: the response rewrite is layer 1 above, added in 0.18.0 and
+ * measured. The stall recovery is still missing, which is why adSlots is left
+ * alone on the cold-load path rather than removed and recovered from.
  *
  * Ad requests are not blocked at all: the declarative rules that did that were
  * removed in 0.17.0 because they stopped playback outright.
@@ -278,6 +287,159 @@
 
   guardGlobal("ytInitialPlayerResponse");
   guardGlobal("playerResponse");
+
+  // ---------------------------------------------------- player responses
+  //
+  // RENAME the ad keys in the response body, before the page parses it.
+  //
+  // This is uBO's second layer, and on Chrome it is page script exactly like
+  // this — trusted-replace-fetch-response and trusted-replace-xhr-response,
+  // '"adSlots"' to '"no_ads"', on /player. The network-level `replace=` form
+  // of the same rule is the Firefox branch. An earlier version of this file
+  // asserted the opposite and dropped the idea as too slow.
+  //
+  // Renaming beats both other shapes, measured 2026-08-27:
+  //
+  //   getter -> undefined   n=14 cold   0 fast, 6 slow, 8 never started
+  //   delete the key        n=7  cold   0 fast, 3 slow, 4 never started
+  //   RENAME, in-session    n=3         all played, no ad, buffer 15-24s
+  //
+  // In the rename runs the player's own getPlayerResponse() came back with
+  // adSlots and adPlacements absent and no_ads present, so the edited body
+  // reached the player rather than the behaviour merely looking right.
+  //
+  // Why this shape works where the others did not: a getter and a delete both
+  // leave the player having already been told an ad was scheduled, and then
+  // unable to fetch it. A rename means the key never exists as far as the
+  // parser is concerned, so nothing can react to a slot that was never there.
+  //
+  // NOT measured, and not claimed: the cold load. YouTube embeds the player
+  // response in the page HTML, so there is no request to rewrite and this
+  // layer cannot apply. Cold loads still take the keep path in neutralise().
+  //
+  // Only /player and /get_watch bodies are read. Every other request is
+  // returned untouched and unbuffered, which is the part the old blanket fetch
+  // wrapper got wrong.
+  const PLAYER_URL = /\/youtubei\/v1\/(player|get_watch)(\?|$)/;
+  const AD_KEY_RE = /"(adPlacements|adSlots|playerAds)"/g;
+  let rewrites = { fetch: 0, xhr: 0 };
+
+  const noRewrite = location.search.indexOf("ytacnorewrite=1") !== -1;
+
+  function publishRewrites() {
+    try {
+      document.documentElement.setAttribute(
+        "data-ytac-rewrote",
+        `fetch=${rewrites.fetch},xhr=${rewrites.xhr}`,
+      );
+    } catch {
+      /* reporting only */
+    }
+  }
+
+  /** Returns the patched body, or null when there was nothing to rename. */
+  function renameAdKeys(text) {
+    if (typeof text !== "string" || text.indexOf('"ad') === -1) return null;
+    AD_KEY_RE.lastIndex = 0;
+    if (!AD_KEY_RE.test(text)) return null;
+    AD_KEY_RE.lastIndex = 0;
+    // "no_ads" is what uBO renames these to. The name is arbitrary; what
+    // matters is that it is inert and the same length class, so nothing that
+    // walks the object finds an ad key.
+    return text.replace(AD_KEY_RE, '"no_ads"');
+  }
+
+  if (!noRewrite) {
+    try {
+      const nativeFetch = window.fetch;
+      window.fetch = function (input, init) {
+        const url =
+          typeof input === "string"
+            ? input
+            : (input && (input.url || String(input))) || "";
+        const pending = nativeFetch.apply(this, arguments);
+        if (!PLAYER_URL.test(url)) return pending;
+
+        return pending.then((res) => {
+          // Any failure here must hand back the untouched response: a missing
+          // player response is a dead player, which is far worse than an ad.
+          try {
+            return res
+              .text()
+              .then((text) => {
+                const patched = renameAdKeys(text);
+                if (patched) {
+                  rewrites.fetch++;
+                  publishRewrites();
+                }
+                const headers = new Headers(res.headers);
+                // The body length changed, so a stale value would be a lie.
+                headers.delete("content-length");
+                return new Response(patched || text, {
+                  status: res.status,
+                  statusText: res.statusText,
+                  headers,
+                });
+              })
+              .catch(() => res);
+          } catch {
+            return res;
+          }
+        });
+      };
+    } catch {
+      /* the global neutralisation above still applies */
+    }
+
+    try {
+      const nativeOpen = XMLHttpRequest.prototype.open;
+      const nativeSend = XMLHttpRequest.prototype.send;
+
+      XMLHttpRequest.prototype.open = function (method, url) {
+        try {
+          this.__ytacUrl = String(url || "");
+        } catch {
+          /* ignore */
+        }
+        return nativeOpen.apply(this, arguments);
+      };
+
+      XMLHttpRequest.prototype.send = function () {
+        try {
+          if (PLAYER_URL.test(this.__ytacUrl || "")) {
+            this.addEventListener("readystatechange", function () {
+              if (this.readyState !== 4) return;
+              try {
+                // responseText throws when responseType is set to anything
+                // other than "" or "text"; those responses are left alone.
+                const patched = renameAdKeys(this.responseText);
+                if (!patched) return;
+                Object.defineProperty(this, "responseText", { value: patched });
+                Object.defineProperty(this, "response", { value: patched });
+                rewrites.xhr++;
+                publishRewrites();
+              } catch {
+                /* leave the response exactly as it arrived */
+              }
+            });
+          }
+        } catch {
+          /* ignore */
+        }
+        return nativeSend.apply(this, arguments);
+      };
+    } catch {
+      /* fetch covers the modern path; XHR is a backstop */
+    }
+
+    publishRewrites();
+  } else {
+    try {
+      document.documentElement.setAttribute("data-ytac-norewrite", "1");
+    } catch {
+      /* reporting only */
+    }
+  }
 
   // Detection scripts read this to decide whether ads loaded.
   //
