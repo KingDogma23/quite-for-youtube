@@ -292,6 +292,10 @@
           gap: null,
           play: null,
           sched: root.getAttribute("data-ytac-adsched-fetch") || "",
+          // These were omitted, so an abandoned hop — the worst kind — logged
+          // "undefined:undefined" exactly where its media counts belong.
+          media: mediaDelta(),
+          stalls: `${stalls ? `stall${stalls}/${stallWorst}ms` : ""}${resets ? `reset${resets}@${resetAt}ms` : ""}`,
           hidden: hiddenEver ? 1 : 0,
         });
       }
