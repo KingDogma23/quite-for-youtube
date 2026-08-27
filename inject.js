@@ -367,7 +367,21 @@
   // returned untouched and unbuffered, which is the part the old blanket fetch
   // wrapper got wrong.
   const PLAYER_URL = /\/youtubei\/v1\/(player|get_watch)(\?|$)/;
-  const AD_KEY_RE = /"(adPlacements|adSlots|playerAds)"/g;
+  // adSlots is NOT renamed. The cold-load path learned this in 0.17.5 —
+  // taking that key away stalls the player — and the same lesson simply was
+  // never applied to the fetch path, which is where clicking a video goes.
+  //
+  // Measured 2026-08-27, visible tab, six clicked hops per arm:
+  //
+  //   rewrite ON,  response carries adSlots   6 of 6 slow, ~5.3s, gaps ~4.2s
+  //   rewrite OFF, response carries adSlots   fast, 528ms, gap 272ms
+  //   neither arm, no adSlots in response     fast in both
+  //
+  // That is the delay Martin reported for days: a four-second wait on exactly
+  // the videos where YouTube fills ad slots, on exactly the navigation path he
+  // uses. adPlacements and playerAds are still renamed, and those are what
+  // actually carry the ads that get removed.
+  const AD_KEY_RE = /"(adPlacements|playerAds)"/g;
   let rewrites = { fetch: 0, xhr: 0 };
 
   const noRewrite = location.search.indexOf("ytacnorewrite=1") !== -1;
