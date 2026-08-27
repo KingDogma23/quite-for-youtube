@@ -129,7 +129,7 @@
 
   // Which shape adSlots is given. Diagnostic switch; see neutralise().
   const slotsMode =
-    (location.search.match(/[?&]ytacslots=(keep|delete|undef)/) || [])[1] || "keep";
+    (location.search.match(/[?&]ytacslots=(keep|delete|undef|empty)/) || [])[1] || "keep";
   try {
     // Always stamped, not only when overridden: which mode ran is the first
     // thing any reading about a stall needs to say.
@@ -208,6 +208,29 @@
       //   ?ytacslots=delete   delete the key; stalls the same way
       if (key === "adSlots") {
         if (slotsMode === "keep") continue;
+        // ?ytacslots=empty — an EMPTY ARRAY rather than nothing.
+        //
+        // Traced 2026-08-27: on a stalled load the player response arrives
+        // 200 and the SABR media request comes back 503. The player is not
+        // waiting for an ad; the media server is refusing the playback
+        // request. That request's context is built from the player response,
+        // so a missing adSlots may simply make it malformed. An empty array
+        // is well-formed and still carries no ads. Untested — the ad-serving
+        // window closed before it could be run.
+        if (slotsMode === "empty") {
+          try {
+            Object.defineProperty(payload, key, {
+              configurable: true,
+              enumerable: true,
+              get: () => [],
+              set: () => {},
+            });
+            hit = true;
+          } catch {
+            /* a locked property is left alone */
+          }
+          continue;
+        }
         if (slotsMode === "delete") {
           try {
             delete payload[key];
