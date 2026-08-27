@@ -475,18 +475,28 @@
           // Any failure here must hand back the untouched response: a missing
           // player response is a dead player, which is far worse than an ad.
           try {
+            // A body can only be read ONCE. Reading the real response and then
+            // returning it on failure hands YouTube a consumed stream, and the
+            // caller throws "body stream already read" — an error this file
+            // caused and then hid behind its own catch. Inspect a CLONE, so
+            // the original is always intact to fall back to.
+            if (!res || res.status === 0 || res.status === 204 || res.status === 304) {
+              return res;
+            }
             return res
+              .clone()
               .text()
               .then((text) => {
                 const patched = renameAdKeys(text);
-                if (patched) {
-                  rewrites.fetch++;
-                  publishRewrites();
-                }
+                // Nothing to rename: give back the original, untouched and
+                // unbuffered, rather than rebuilding an identical one.
+                if (!patched) return res;
+                rewrites.fetch++;
+                publishRewrites();
                 const headers = new Headers(res.headers);
                 // The body length changed, so a stale value would be a lie.
                 headers.delete("content-length");
-                return new Response(patched || text, {
+                return new Response(patched, {
                   status: res.status,
                   statusText: res.statusText,
                   headers,
