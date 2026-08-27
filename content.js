@@ -131,6 +131,51 @@
       }
     };
 
+    /**
+     * A rolling log of every hop, written when the hop finishes.
+     *
+     * Address-bar loads do not reproduce clicks: YouTube serves a soft
+     * navigation a different ad schedule from a cold load of the same video —
+     * measured 2026-08-27, where a clicked hop carried adSlots and six cold
+     * loads of that same video did not. Every A/B run from the address bar was
+     * therefore testing a path the viewer was not on.
+     *
+     * So the page records the real thing instead: one line per hop, kept in
+     * memory and readable afterwards. An ordinary browsing session then yields
+     * twenty measured hops rather than one recreated badly.
+     */
+    const LOG_MAX = 40;
+    const hops = [];
+
+    const logHop = () => {
+      const ls = marks.loadstart;
+      const meta = marks.loadedmetadata;
+      const play = marks.playing;
+      if (ls === undefined || play === undefined) return;
+      hops.push({
+        n: navCount,
+        id: currentId,
+        ls,
+        gap: meta === undefined ? null : meta - ls,
+        play,
+        sched: root.getAttribute("data-ytac-adsched-fetch") || "",
+        hidden: hiddenEver ? 1 : 0,
+      });
+      if (hops.length > LOG_MAX) hops.shift();
+      try {
+        // Compact on purpose: this is read as text from the page.
+        root.setAttribute(
+          "data-ytac-hops",
+          hops
+            .slice(-12)
+            .map((h) => `${h.n}:${h.id}:${h.play}ms:gap${h.gap}:${h.sched}:h${h.hidden}`)
+            .join(" | "),
+        );
+      } catch {
+        /* reporting only */
+      }
+    };
+
     // The slowest hop of the session, kept rather than sampled.
     //
     // Polling every ten seconds only catches a slow start by luck: a video
@@ -145,6 +190,7 @@
     const mark = (name) => {
       if (name in marks) return; // first occurrence only
       marks[name] = at();
+      if (name === "playing") logHop();
       if (name === "advancing") {
         const ms = marks[name];
         if (ms > worst.ms) worst = { id: videoId(), ms };
@@ -171,6 +217,19 @@
     const rearm = () => {
       const id = videoId();
       if (id === currentId) return;
+      // A hop the viewer abandoned mid-spin never fires playing, and those are
+      // exactly the ones worth seeing. Record it as it was left.
+      if (marks.loadstart !== undefined && marks.playing === undefined) {
+        hops.push({
+          n: navCount,
+          id: currentId,
+          ls: marks.loadstart,
+          gap: null,
+          play: null,
+          sched: root.getAttribute("data-ytac-adsched-fetch") || "",
+          hidden: hiddenEver ? 1 : 0,
+        });
+      }
       currentId = id;
       marks = Object.create(null);
       navBase = performance.now();
