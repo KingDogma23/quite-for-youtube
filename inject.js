@@ -466,6 +466,126 @@
     }
   }
 
+  // ------------------------------------------------------- stall recovery
+  //
+  // uBO's third layer, and the reason it can afford to remove adSlots outright
+  // where this extension cannot. quick-fixes.txt watches getStatsForNerds()
+  // and, on buffer_health_seconds "0.00 s" with resolution "0x0", calls
+  // loadVideoById to retry the load.
+  //
+  // Why a retry helps rather than repeating the same failure: the stall only
+  // happens on a COLD load, where the player response was embedded in the page
+  // HTML and no request existed to rewrite. loadVideoById makes the player
+  // FETCH a fresh player response — which the rewrite above does clean. So the
+  // retry does not repeat the failing path, it moves onto the working one.
+  //
+  // Three guards, because reloading a video that is merely slow would be worse
+  // than the bug:
+  //
+  //   - two independent signals must agree: the media element reports nothing
+  //     loaded AND the player's own stats report a dead buffer at 0x0
+  //   - the condition must hold for SETTLE_SAMPLES consecutive seconds, so a
+  //     video that is starting normally is never touched
+  //   - at most MAX_RECOVERIES attempts, and only in the first WINDOW_MS after
+  //     load, after which a stall is someone else's problem
+  const MAX_RECOVERIES = 2;
+  const SETTLE_SAMPLES = 4; // seconds of agreement before acting
+  const WINDOW_MS = 45000;
+
+  let recoveries = 0;
+  let stalledFor = 0;
+
+  function publishRecovery(note) {
+    try {
+      document.documentElement.setAttribute(
+        "data-ytac-recovered",
+        `${recoveries}${note ? "," + note : ""}`,
+      );
+    } catch {
+      /* reporting only */
+    }
+  }
+
+  /** Both signals must agree, and neither is trusted on its own. */
+  function isStalled(player, video) {
+    if (!player || !video) return false;
+    // Signal one: the media element has nothing and is not merely paused.
+    if (video.readyState > 0 || video.currentTime > 0 || video.paused) return false;
+    // Signal two: the player's own diagnostics.
+    let stats = null;
+    try {
+      stats = player.getStatsForNerds ? player.getStatsForNerds() : null;
+    } catch {
+      return false;
+    }
+    if (!stats) return false;
+    return (
+      String(stats.buffer_health_seconds || "").indexOf("0.00") === 0 &&
+      String(stats.resolution || "").indexOf("0x0") !== -1
+    );
+  }
+
+  function recover(player) {
+    try {
+      const response = player.getPlayerResponse ? player.getPlayerResponse() : null;
+      const videoId = response && response.videoDetails && response.videoDetails.videoId;
+      if (!videoId || typeof player.loadVideoById !== "function") {
+        publishRecovery("no-api");
+        return;
+      }
+      const start =
+        (response.playerConfig &&
+          response.playerConfig.playbackStartConfig &&
+          response.playerConfig.playbackStartConfig.startSeconds) ||
+        0;
+      recoveries++;
+      publishRecovery("reloading");
+      player.loadVideoById(videoId, start);
+    } catch {
+      publishRecovery("failed");
+    }
+  }
+
+  if (location.search.indexOf("ytacnorecover=1") === -1) {
+    const startWatch = () => {
+      const began = performance.now();
+      const timer = setInterval(() => {
+        try {
+          if (recoveries >= MAX_RECOVERIES || performance.now() - began > WINDOW_MS) {
+            clearInterval(timer);
+            return;
+          }
+          const player = document.getElementById("movie_player");
+          const video = player && player.querySelector("video");
+          if (!isStalled(player, video)) {
+            stalledFor = 0;
+            return;
+          }
+          stalledFor++;
+          if (stalledFor >= SETTLE_SAMPLES) {
+            stalledFor = 0;
+            recover(player);
+          }
+        } catch {
+          /* a broken watcher must never break playback */
+        }
+      }, 1000);
+    };
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", startWatch, { once: true });
+    } else {
+      startWatch();
+    }
+    publishRecovery();
+  } else {
+    try {
+      document.documentElement.setAttribute("data-ytac-norecover", "1");
+    } catch {
+      /* reporting only */
+    }
+  }
+
   Object.defineProperty(window, "__ytacNeutralised", { get: () => neutralised });
   publish();
 })();
