@@ -83,4 +83,6 @@ It is an ordinary link — nothing is sent anywhere unless you click it.
 
 MIT — see [LICENSE](LICENSE).
 
-Not affiliated with YouTube or Google.
+YouTube™ is a trademark of Google LLC. This extension is an
+independent project and is not affiliated with, endorsed by or sponsored
+by Google LLC.

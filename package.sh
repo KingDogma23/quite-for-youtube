@@ -93,7 +93,20 @@ print(f"  manifest references {len(set(refs))} files, all present")
 PY
 
 # --- zip --------------------------------------------------------------------
-( cd dist && zip -r -q -X "${NAME}-${VERSION}.zip" "${NAME}-${VERSION}" -x '*.DS_Store' )
+# Two layouts, because they are consumed by different things.
+#
+#   default   the folder is INSIDE the zip, so unzipping yields the folder
+#             that "Load unpacked" expects
+#   --store   the files are at the ROOT of the zip, which is what the Chrome
+#             Web Store requires; a zip with a wrapping folder is rejected
+#             with "Manifest file is missing or unreadable"
+if [[ "${1:-}" == "--store" ]]; then
+  ZIP="dist/${NAME}-${VERSION}-store.zip"
+  rm -f "$ZIP"
+  ( cd "$STAGE" && zip -r -q -X "../../${ZIP}" . -x '*.DS_Store' )
+else
+  ( cd dist && zip -r -q -X "${NAME}-${VERSION}.zip" "${NAME}-${VERSION}" -x '*.DS_Store' )
+fi
 rm -rf "$STAGE"
 
 SIZE="$(du -h "$ZIP" | cut -f1 | tr -d ' ')"
