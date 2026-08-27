@@ -1,4 +1,4 @@
-# Chrome Web Store submission — Quite for YouTube
+# Chrome Web Store submission — Quite for YouTube™
 
 Publisher: **Quite Apps**  ·  Contact: **support@quiteapps.co.uk**
 Package: `dist/yt-ad-cleaner-<version>-store.zip` (built with `./package.sh --store`)
