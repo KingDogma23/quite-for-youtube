@@ -128,9 +128,33 @@
       }
     };
 
+    // The slowest hop of the session, kept rather than sampled.
+    //
+    // Polling every ten seconds only catches a slow start by luck: a video
+    // that spun for four seconds and then played looks identical to one that
+    // never spun, unless the sample happens to land inside those four
+    // seconds. Six samples missed a delay the viewer watched happen. So the
+    // page records its own worst case and holds onto it.
+    let worst = { id: "", ms: -1 };
+    let slowCount = 0;
+    const SLOW_MS = 3000;
+
+    const videoId = () => (location.search.match(/[?&]v=([\w-]{11})/) || [])[1] || "?";
+
     const mark = (name) => {
       if (name in marks) return; // first occurrence only
       marks[name] = at();
+      if (name === "advancing") {
+        const ms = marks[name];
+        if (ms > worst.ms) worst = { id: videoId(), ms };
+        if (ms > SLOW_MS) slowCount++;
+        try {
+          root.setAttribute("data-ytac-worst", `${worst.id}=${worst.ms}`);
+          root.setAttribute("data-ytac-slow", String(slowCount));
+        } catch {
+          /* reporting only */
+        }
+      }
       publish();
     };
 
