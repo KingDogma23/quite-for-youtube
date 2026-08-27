@@ -16,16 +16,17 @@
  *        set-constant  ytInitialPlayerResponse.playerAds     undefined
  *        set-constant  playerResponse.adPlacements           undefined
  *
- *        set-constant  ytInitialPlayerResponse.adSlots       undefined
+ *      adSlots is NOT touched on this path. Removing it stalls the player
+ *      dead, and neither the stall recovery (0.20.0) nor uBO's client-identity
+ *      retry (0.20.1) rescues it — both were tried and measured. Those ads
+ *      play and are skipped by content.js. See neutralise().
  *
- *      adSlots on this path stalled the player badly enough to ship without
- *      it in 0.17.5. It is back as of 0.20.0 because layer 3 gives the stall
- *      an exit. See neutralise() for the numbers and the way back out.
- *
- *   3. STALL RECOVERY — the safety net under both, at the end of this file.
- *      When the player has nothing loaded AND reports a dead buffer at 0x0,
- *      it is reloaded once, which turns the embedded-response path into a
- *      fetch that layer 1 can clean.
+ *   3. STALL RECOVERY — a safety net, at the end of this file. When the
+ *      player has nothing loaded AND reports a dead buffer at 0x0, it is
+ *      reloaded, under a rotated client identity. It does NOT rescue the
+ *      adSlots stall, which is why layer 2 leaves that key alone; it is kept
+ *      because a reload is the right response to a player that has nothing,
+ *      and it costs nothing when nothing is wrong.
  *
  * google_ad_status is also set, and is close to pointless: YouTube sets it to
  * 1 itself, measured with ?ytacnostatus=1.
@@ -54,11 +55,16 @@
  * So uBO does neutralise adSlots on www.youtube.com, and it evidently hits the
  * same wall, because it ships a dedicated recovery for it — plus a seek to
  * duration when getStatsForNerds() reports "SSAP, AD", which is YouTube
- * stitching the ad into the stream server-side. This file now has two of
- * uBO's three layers — the response rewrite (0.18.0) and the stall recovery
- * (0.19.0) — and not the SSAP seek. adSlots is still left alone on the
- * cold-load path: removing it and relying on recovery is the obvious next
- * move, and it is not the default until it has been measured that way.
+ * stitching the ad into the stream server-side. This file has the response
+ * rewrite (0.18.0), the stall recovery (0.19.0) and the client-identity retry
+ * (0.20.1), and not the SSAP seek.
+ *
+ * Copying two of uBO's layers did NOT buy uBO's behaviour. Removing adSlots on
+ * the cold path with both of them in place was measured on 2026-08-27 and the
+ * player still died — see neutralise(). Something else in what uBO does is
+ * load-bearing, and guessing at which piece has now cost two attempts. The
+ * next move is reading how their recovery actually behaves on a stalled
+ * SSAP load, not adding a fourth thing that sounds plausible.
  *
  * Ad requests are not blocked at all: the declarative rules that did that were
  * removed in 0.17.0 because they stopped playback outright.
@@ -123,7 +129,7 @@
 
   // Which shape adSlots is given. Diagnostic switch; see neutralise().
   const slotsMode =
-    (location.search.match(/[?&]ytacslots=(keep|delete|undef)/) || [])[1] || "undef";
+    (location.search.match(/[?&]ytacslots=(keep|delete|undef)/) || [])[1] || "keep";
   try {
     // Always stamped, not only when overridden: which mode ran is the first
     // thing any reading about a stall needs to say.
@@ -170,33 +176,36 @@
     for (const key of AD_KEYS) {
       if (!(key in payload)) continue;
 
-      // adSlots IS removed here, and the stall recovery is what makes that
-      // affordable. This is the same call uBO makes, in the same order.
+      // adSlots is LEFT ALONE. Removing it was tried twice more and failed
+      // twice more; this is now three measured attempts, not an assumption.
       //
-      // Measured 2026-08-27, cold loads of never-visited videos, first frame
-      // from the page's own media events:
+      //   getter -> undefined   n=14 cold   0 fast, 6 slow, 8 never started
+      //   delete the key        n=7  cold   0 fast, 3 slow, 4 never started
+      //   untouched             n=4  cold   all fast (~1.5s), the ad plays
       //
-      //   adSlots -> getter undefined   n=14   0 fast, 6 slow (5-10s), 8 never
-      //   adSlots -> deleted            n=7    0 fast, 3 slow,          4 never
-      //   adSlots -> untouched          n=4    all fast (~1.5s), ad plays
+      // 0.20.0 removed it anyway, betting that the stall recovery would carry
+      // the failures. It did not: a cold load reached 10-15s and two reloads.
+      // 0.20.1 then added uBO's client-identity retry — rotating
+      // INNERTUBE_CONTEXT.client.userAgent and setting clientScreen CHANNEL on
+      // the retried request — on the theory that an identical retry gets an
+      // identical answer. Measured 2026-08-27, tab visible throughout:
       //
-      // Those failures are why 0.17.5 shipped with adSlots untouched. What
-      // changed is not the risk but the response to it: 0.19.0 added the stall
-      // recovery, which reloads the player, and a reload FETCHES the player
-      // response, which the rewrite above renames cleanly. So the failing path
-      // now has an exit, and taking it costs about four seconds.
+      //   5ZsnnvcPuNg   P=24,S=8   recovery fired, identity rotated,
+      //                            request edited, and at 18s AND 36s the
+      //                            player was still readyState 0 with only
+      //                            loadstart in data-ytac-ttff. Dead.
       //
-      // Recovery observed doing exactly that, 3 of 3, ending with no_ads in
-      // the player's own response. What has NOT been observed is recovery
-      // rescuing the permanent version of the failure, because that stopped
-      // reproducing before it could be tested. If a stalled player is ever
-      // seen sitting past the recovery window, ?ytacslots=keep is the setting
-      // that trades ads-removed back for ads-skipped, and this default is what
-      // should be reconsidered first.
+      // So neither recovery nor a rotated identity rescues this. Whatever uBO
+      // does to survive removing adSlots, it is not only these two things.
+      // Until that is understood, the ad plays on the cold path and is skipped
+      // by content.js, which costs an ad and never costs the video.
       //
-      //   (default)           undefined, as uBO does
-      //   ?ytacslots=delete   delete the key outright
-      //   ?ytacslots=keep     leave it alone; the ad plays and is skipped
+      // The in-session path is unaffected and still removes ads outright —
+      // that is layer 1, and it is where most viewing happens.
+      //
+      //   (default)           leave adSlots alone
+      //   ?ytacslots=undef    the getter; stalls, kept for re-testing
+      //   ?ytacslots=delete   delete the key; stalls the same way
       if (key === "adSlots") {
         if (slotsMode === "keep") continue;
         if (slotsMode === "delete") {
