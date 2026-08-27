@@ -1,8 +1,8 @@
 /**
  * Quite for YouTube — page-world ad neutralisation.
  *
- * Two layers, because they cover different paths and only one of them can
- * apply on any given load.
+ * Three layers. The first two cover different paths, and only one of them can
+ * apply on any given load; the third catches what the second cannot fix.
  *
  *   1. RESPONSE REWRITE — for player responses that arrive over fetch or XHR,
  *      which is every video opened from inside YouTube. The ad keys are
@@ -20,6 +20,11 @@
  *      or by deleting the key, both measured — stops the player ever
  *      receiving media. Those ads play and are skipped by content.js instead.
  *      See neutralise() for the numbers.
+ *
+ *   3. STALL RECOVERY — the safety net under both, at the end of this file.
+ *      When the player has nothing loaded AND reports a dead buffer at 0x0,
+ *      it is reloaded once, which turns the embedded-response path into a
+ *      fetch that layer 1 can clean.
  *
  * google_ad_status is also set, and is close to pointless: YouTube sets it to
  * 1 itself, measured with ?ytacnostatus=1.
@@ -48,10 +53,11 @@
  * So uBO does neutralise adSlots on www.youtube.com, and it evidently hits the
  * same wall, because it ships a dedicated recovery for it — plus a seek to
  * duration when getStatsForNerds() reports "SSAP, AD", which is YouTube
- * stitching the ad into the stream server-side. Of uBO's three layers this
- * file now has two: the response rewrite is layer 1 above, added in 0.18.0 and
- * measured. The stall recovery is still missing, which is why adSlots is left
- * alone on the cold-load path rather than removed and recovered from.
+ * stitching the ad into the stream server-side. This file now has two of
+ * uBO's three layers — the response rewrite (0.18.0) and the stall recovery
+ * (0.19.0) — and not the SSAP seek. adSlots is still left alone on the
+ * cold-load path: removing it and relying on recovery is the obvious next
+ * move, and it is not the default until it has been measured that way.
  *
  * Ad requests are not blocked at all: the declarative rules that did that were
  * removed in 0.17.0 because they stopped playback outright.
@@ -555,6 +561,19 @@
             clearInterval(timer);
             return;
           }
+          // Never reload a backgrounded tab.
+          //
+          // One of the two stall signals is the player reporting 0x0
+          // resolution, and a hidden tab can report that for entirely innocent
+          // reasons — nothing is being composited. Someone listening to a
+          // video in another tab must not have it restarted underneath them.
+          // The counter resets too, so a tab that was hidden for a while does
+          // not act the instant it becomes visible.
+          if (document.visibilityState === "hidden") {
+            stalledFor = 0;
+            return;
+          }
+
           const player = document.getElementById("movie_player");
           const video = player && player.querySelector("video");
           if (!isStalled(player, video)) {
