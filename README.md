@@ -73,6 +73,12 @@ Two lines are worth knowing:
 - `feed ads: N in DOM, 0 STILL VISIBLE` is healthy. Ad elements remaining in
   the DOM is normal; the stylesheet hides them rather than removing them.
 
+## Support
+
+This is free and has no ads, no tracking and no accounts. If it saves you some
+irritation, you can [buy me a coffee](https://buymeacoffee.com/kingdogma23).
+It is an ordinary link — nothing is sent anywhere unless you click it.
+
 ## Licence
 
 MIT — see [LICENSE](LICENSE).
