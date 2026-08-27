@@ -96,10 +96,17 @@
    */
   function installTimeline() {
     const root = document.documentElement;
-    const marks = Object.create(null);
-    // performance.now() is milliseconds since navigation started, so an event
-    // timestamp is time-to-that-event with no arithmetic and no clock skew.
-    const at = () => Math.round(performance.now());
+    let marks = Object.create(null);
+    // Time is measured from the start of THIS video, not the start of the
+    // document. Clicking a video on YouTube is a soft navigation: the document
+    // survives, so a document-relative clock freezes at the first video and
+    // every later hop reports numbers belonging to a video the viewer left
+    // minutes ago. Watching a session on 2026-08-27, every hop reported
+    // "playing=1128" — the first video's figure — while the player in front of
+    // us was spinning. The measurement said fine; the screen said otherwise.
+    let navBase = 0;
+    let navCount = 0;
+    const at = () => Math.round(performance.now() - navBase);
     let hiddenEver = document.visibilityState === "hidden";
 
     const publish = () => {
@@ -113,6 +120,9 @@
         // Any reading taken while this says 1 is void. Foreground the tab and
         // measure again.
         root.setAttribute("data-ytac-hidden", hiddenEver ? "1" : "0");
+        // Which video in the session these figures belong to. 0 is the cold
+        // load; anything higher came from clicking.
+        root.setAttribute("data-ytac-nav", String(navCount));
       } catch {
         /* reporting must never break playback */
       }
@@ -123,6 +133,22 @@
       marks[name] = at();
       publish();
     };
+
+    // YouTube announces its own soft navigations. Re-arm on them, so each
+    // video is timed from the moment it was asked for.
+    const rearm = () => {
+      marks = Object.create(null);
+      navBase = performance.now();
+      navCount++;
+      publish();
+    };
+    for (const evt of ["yt-navigate-start", "yt-navigate-finish"]) {
+      try {
+        document.addEventListener(evt, rearm);
+      } catch {
+        /* diagnostics are optional */
+      }
+    }
 
     try {
       document.addEventListener("visibilitychange", () => {

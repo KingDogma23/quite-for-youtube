@@ -389,6 +389,23 @@
     AD_KEY_RE.lastIndex = 0;
     if (!AD_KEY_RE.test(text)) return null;
     AD_KEY_RE.lastIndex = 0;
+
+    // Record what this RESPONSE carried. data-ytac-adsched only ever saw the
+    // embedded cold-load payload, so during a clicked session it read "none"
+    // however many ad-laden responses went past — the schedule for every video
+    // after the first was invisible.
+    try {
+      const seen = [];
+      for (const [key, label] of Object.entries(LABELS)) {
+        if (text.indexOf('"' + key + '"') !== -1) seen.push(label);
+      }
+      document.documentElement.setAttribute(
+        "data-ytac-adsched-fetch",
+        seen.length ? seen.join(",") : "none",
+      );
+    } catch {
+      /* reporting only */
+    }
     // "no_ads" is what uBO renames these to. The name is arbitrary; what
     // matters is that it is inert and the same length class, so nothing that
     // walks the object finds an ad key.
