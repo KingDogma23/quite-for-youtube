@@ -9,15 +9,9 @@ A Chrome extension that removes ads from YouTube.
 | **Player overlays** | Banners drawn on top of the video |
 | **Merch shelves** | Product shelves under videos (optional, off by default) |
 
-The ad schedule is neutralised in the page, so nothing is queued for the
-player. No requests are blocked, no response bodies are rewritten and nothing
-is delayed.
-
-A version of this did block ad requests with Chrome's declarative rules. Eight
-hand-written rules, and they stopped playback outright — video stuck at
-readyState 0 indefinitely. Removing them restored playback immediately, on two
-videos, with ads still gone. Blocking the right requests is a maintained
-filter list's job; a short hand-written list gets it wrong.
+On most videos no ad is ever queued for the player. On the rest the ad plays
+and is skipped instead — removing those outright stops the video from starting
+at all, so it isn't attempted. No requests are blocked and nothing is delayed.
 
 **Running two ad blockers is worse than running one.** Any network-level
 blocker will trigger the same wall, and with both installed you cannot tell
