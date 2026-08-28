@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Quite for YouTube\u2122",
-  "version": "0.24.0",
-  "description": "Cleans up YouTube\u2122: skips video ads, and hides feed, sidebar, search and Shorts ad panels.",
+  "name": "Quite for YouTube™",
+  "version": "0.24.2",
+  "description": "Cleans up YouTube™: skips video ads, and hides feed, sidebar, search and Shorts ad panels.",
   "permissions": [
     "storage"
   ],

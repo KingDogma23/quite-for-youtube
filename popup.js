@@ -35,29 +35,53 @@ function humanTime(seconds) {
 const compact = (n) =>
   n >= 10000 ? Math.round(n / 1000) + "k" : n.toLocaleString();
 
-function render(d) {
+/**
+ * All-time totals, read from storage rather than from the page.
+ *
+ * They used to come only from the content script, so opening the popup on any
+ * tab that is not YouTube rendered zeros — the numbers were in storage the
+ * whole time. A counter that reads 0 on a working extension is worse than no
+ * counter, because it looks like proof that nothing is happening.
+ */
+async function storedLifetime() {
+  // No alive() guard here: this popup never had one. The Facebook popup does,
+  // and copying its body across without checking is how popup.js:47 threw
+  // "alive is not defined" the moment it was opened. try/catch covers the same
+  // ground — storage is undefined after an extension reload, and that throws.
+  try {
+    const got = await chrome.storage.local.get({ quietLifetime: null });
+    return got.quietLifetime;
+  } catch {
+    return null;
+  }
+}
+
+function render(d, stored) {
   const on = $("enabled").checked;
   $("stateText").textContent = on ? "Protection on" : "Protection off";
   $("stateSub").textContent = on
     ? "Ads removed before they load"
     : "YouTube is showing you everything";
 
+  // Totals first, from whichever source has them: they are all-time figures and
+  // do not depend on which tab is open.
+  const lt = d?.lifetime || stored || { adsBlocked: 0, secondsSaved: 0, adsSkipped: 0 };
+  $("sAds").textContent = compact(lt.adsBlocked || 0);
+  $("sTime").textContent = humanTime(lt.secondsSaved);
+  $("sClean").textContent = compact(lt.adsSkipped || 0);
+
   if (!d) {
     $("ver").textContent = "";
     $("diag").textContent =
-      "Not running on this tab.\n\nOpen a youtube.com tab, or reload it — a " +
-      "content script only attaches at page load. If you just updated the " +
-      "extension, reload it on chrome://extensions first.";
+      "The totals above are all-time, and this tab is not YouTube.\n\n" +
+      "Open a youtube.com tab to see what is happening right now. If you are on " +
+      "YouTube and still seeing this, reload the page — a content script only " +
+      "attaches at page load.";
     lastReport = $("diag").textContent;
     return;
   }
 
   $("ver").textContent = "v" + d.version;
-
-  const lt = d.lifetime || { adsBlocked: 0, secondsSaved: 0, adsSkipped: 0 };
-  $("sAds").textContent = compact(lt.adsBlocked || 0);
-  $("sTime").textContent = humanTime(lt.secondsSaved);
-  $("sClean").textContent = compact(lt.adsSkipped || 0);
 
   const s = d.session;
   const reached = s.videoAdsSkipped + s.videoAdsSeeked;
@@ -89,7 +113,8 @@ function render(d) {
 }
 
 async function refresh() {
-  render(await tell({ type: "diagnostics" }));
+  const [live, stored] = await Promise.all([tell({ type: "diagnostics" }), storedLifetime()]);
+  render(live, stored);
 }
 
 chrome.storage.sync.get(DEFAULTS, (stored) => {
