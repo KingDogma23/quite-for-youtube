@@ -132,6 +132,21 @@
     }
   }
 
+  /**
+   * ?ytacprune=1 — remove adSlots from BOTH paths at once.
+   *
+   * Every stall measured so far removed adSlots from one path while the other
+   * still carried it, and a working blocker removes it from both with no stall
+   * at all. So this is the combination that has never been run, and it stays a
+   * switch until it has been.
+   *
+   * Cold path: adSlots is deleted alongside the other ad keys.
+   * Fetch path: the response is parsed and the properties are DELETED, then
+   * re-serialised — rather than renaming the key in the text, which leaves the
+   * value in place under another name.
+   */
+  const pruneMode = location.search.indexOf("ytacprune=1") !== -1;
+
   // Which shape adSlots is given. Diagnostic switch; see neutralise().
   const slotsMode =
     (location.search.match(/[?&]ytacslots=(keep|delete|undef|empty)/) || [])[1] || "keep";
@@ -139,6 +154,9 @@
     // Always stamped, not only when overridden: which mode ran is the first
     // thing any reading about a stall needs to say.
     document.documentElement.setAttribute("data-ytac-slots", slotsMode);
+    // Stamped whether on or off: a reading that does not say which arm it came
+    // from is the reading that gets attributed to the wrong one.
+    document.documentElement.setAttribute("data-ytac-prune", pruneMode ? "1" : "0");
   } catch {
     /* reporting only */
   }
@@ -213,6 +231,17 @@
       //   ?ytacslots=delete   delete the key; stalls the same way
       //   ?ytacslots=empty    an empty array; removes the ad, stalls 9s
       if (key === "adSlots") {
+        // Under ?ytacprune=1 it goes here too, so the cold payload and every
+        // later response tell the player the same story.
+        if (pruneMode) {
+          try {
+            delete payload[key];
+            neutralised++;
+          } catch {
+            /* leave it rather than break the payload */
+          }
+          continue;
+        }
         if (slotsMode === "keep") continue;
         // ?ytacslots=empty — an EMPTY ARRAY rather than nothing.
         //
@@ -234,9 +263,40 @@
         // context theory is wrong: a well-formed empty array stalls just as
         // hard. All three ways of touching adSlots cost the load.
         //
-        // uBlock Origin blocks the same ad on the same video with no stall at
-        // all (266ms, measured the same afternoon), so whatever it does, it is
-        // not this. That is the lead worth following, and it is not adSlots.
+        // A working blocker (Adblock for Youtube 7.2.5, read from disk the same
+        // afternoon) blocks the same ad on the same video in 266ms with no
+        // stall — and it DOES remove adSlots. So "touching adSlots costs the
+        // load" is true of these three implementations, not of the technique.
+        //
+        // What it does that we do not:
+        //   - prunes the PROPERTY from fetch and XHR responses, rather than
+        //     renaming the key in the response text
+        //   - removes adPlacements, playerAds AND adSlots on those responses
+        //   - sets ytInitialPlayerResponse.adSlots undefined on the cold path
+        //     as well, so both paths agree
+        //   - prunes conditionally on playerResponse.streamingData
+        //     .serverAbrStreamingUrl being present, i.e. only SABR responses
+        //
+        // The inconsistency theory — that the stall came from removing adSlots
+        // on one path while the other still carried it — was TESTED on
+        // 2026-08-28 via ?ytacprune=1, which deletes the properties from the
+        // cold payload and from every fetch response. Both arms valid, window
+        // foregrounded, same session:
+        //
+        //   ?ytacprune=1   first frame 10,235ms   no ad
+        //   control         first frame  1,227ms   ad played
+        //
+        // Refuted. Consistency makes no difference; that is four ways of
+        // removing adSlots — getter, delete, empty array, prune-both-paths —
+        // each costing about nine seconds and each removing the ad.
+        //
+        // Since a shipped blocker removes adSlots with no stall at all, the
+        // difference is not in how the JSON is edited. What it has and we do
+        // not is network-level blocking: declarativeNetRequest, webRequest and
+        // <all_urls>. The player presumably never waits on ad media it was
+        // never allowed to request. Note 0.17.0 removed hand-written DNR rules
+        // from this extension for stalling the player — so the lesson is that
+        // OUR rules were wrong, not that the approach is.
         if (slotsMode === "empty") {
           try {
             Object.defineProperty(payload, key, {
@@ -397,6 +457,9 @@
   // uses. adPlacements and playerAds are still renamed, and those are what
   // actually carry the ads that get removed.
   const AD_KEY_RE = /"(adPlacements|playerAds)"/g;
+  // Only under ?ytacprune=1, and note adSlots is in this list where it is
+  // deliberately absent from AD_KEY_RE above.
+  const PRUNE_KEYS = ["adPlacements", "playerAds", "adSlots"];
   let rewrites = { fetch: 0, xhr: 0 };
 
   const noRewrite = location.search.indexOf("ytacnorewrite=1") !== -1;
@@ -416,7 +479,10 @@
   function renameAdKeys(text) {
     if (typeof text !== "string" || text.indexOf('"ad') === -1) return null;
     AD_KEY_RE.lastIndex = 0;
-    if (!AD_KEY_RE.test(text)) return null;
+    // Under prune, a body carrying only adSlots is worth processing — the
+    // rename regex would have skipped it, which is how the two paths came to
+    // disagree in the first place.
+    if (!AD_KEY_RE.test(text) && !(pruneMode && text.indexOf('"adSlots"') !== -1)) return null;
     AD_KEY_RE.lastIndex = 0;
 
     // Record what this RESPONSE carried. data-ytac-adsched only ever saw the
@@ -435,6 +501,36 @@
     } catch {
       /* reporting only */
     }
+    // ?ytacprune=1 — delete the properties outright, adSlots included, the way
+    // the working blocker does. Renaming leaves the value in place under
+    // another name; a parse/delete/stringify removes it, and removes it from
+    // the same response the cold path has already been cleaned of.
+    //
+    // Falls back to renaming if the body is not JSON we can round-trip. A
+    // response we cannot parse must be returned untouched rather than
+    // half-processed.
+    if (pruneMode) {
+      try {
+        const obj = JSON.parse(text);
+        let hit = 0;
+        const strip = (o) => {
+          if (!o || typeof o !== "object") return;
+          for (const key of PRUNE_KEYS) {
+            if (Object.prototype.hasOwnProperty.call(o, key)) {
+              delete o[key];
+              hit++;
+            }
+          }
+          if (o.playerResponse) strip(o.playerResponse);
+        };
+        strip(obj);
+        if (!hit) return null;
+        return JSON.stringify(obj);
+      } catch {
+        /* not round-trippable; fall through to the rename below */
+      }
+    }
+
     // "no_ads" is what uBO renames these to. The name is arbitrary; what
     // matters is that it is inert and the same length class, so nothing that
     // walks the object finds an ad key.
