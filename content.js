@@ -169,6 +169,106 @@
       return diff.join(",") || "none";
     };
 
+    function publishHops() {
+      try {
+        // Compact on purpose: this is read as text from the page.
+        root.setAttribute(
+          "data-ytac-hops",
+          hops
+            .slice(-12)
+            .map(
+              (h) =>
+                `${h.n}:${h.id}:${h.play}ms:gap${h.gap}:${h.sched}:${h.media}:${h.stalls}:h${h.hidden}` +
+                (h.health ? `:${h.health}` : ""),
+            )
+            .join(" | "),
+        );
+      } catch {
+        /* reporting only */
+      }
+    }
+
+    /**
+     * Did it KEEP playing, with a picture and sound?
+     *
+     * Everything above this answers "did it start". On 2026-08-28 all eight
+     * clicked hops logged a first frame inside 226ms and the viewer reported
+     * two that never played and four with no sound — because `playing` fires,
+     * and currentTime advances, for a black frame with a silent audio track.
+     * The instrument was measuring the clock, not the film.
+     *
+     * So five seconds after the first frame, ask the video element what it
+     * actually produced: seconds played, frames decoded and dropped, audio
+     * bytes decoded, and whether it is muted, paused or has no picture.
+     */
+    function watchHealth(hop) {
+      if (!hop) return;
+      const id = hop.id;
+
+      /**
+       * Did an advert actually play on this hop?
+       *
+       * Until now the only witness was the viewer saying "I saw one advert
+       * start", which cannot be lined up against eleven hops. YouTube marks the
+       * player with `ad-showing` for the duration, so poll for it across the
+       * first eight seconds — a pre-roll is over long before the health sample
+       * at five, and a check taken once would miss most of them.
+       *
+       * This is what makes the adSlots question answerable: if the hops that
+       * carry S are the hops that show AD, the remaining ad path is identified
+       * rather than suspected.
+       */
+      let sawAd = false;
+      const adPoll = setInterval(() => {
+        try {
+          const p = document.querySelector("#movie_player");
+          if ((p && p.classList.contains("ad-showing")) || document.querySelector(".ytp-ad-player-overlay")) {
+            sawAd = true;
+          }
+        } catch {
+          /* reporting only */
+        }
+      }, 500);
+      setTimeout(() => clearInterval(adPoll), 8000);
+
+      setTimeout(() => {
+        const a = document.querySelector("video");
+        if (!a || videoId() !== id) return;
+        // Absolute readings, then a one-second re-read. The first attempt took
+        // deltas from the hop's start and produced negative audio byte counts:
+        // webkitAudioDecodedByteCount RESTARTS when the player switches media
+        // source, and YouTube reuses one <video> element across navigations, so
+        // its frame counter is cumulative for the session rather than for this
+        // video. Neither could answer "is it playing NOW", which is the only
+        // question the viewer is asking.
+        const t0 = a.currentTime;
+        const audio0 = a.webkitAudioDecodedByteCount || 0;
+        const frames0 = a.getVideoPlaybackQuality ? a.getVideoPlaybackQuality().totalVideoFrames : 0;
+        setTimeout(() => {
+          try {
+            const b = document.querySelector("video");
+            if (!b || videoId() !== id) return;
+            const q = b.getVideoPlaybackQuality ? b.getVideoPlaybackQuality() : null;
+            const moved = b.currentTime - t0;
+            const audio = (b.webkitAudioDecodedByteCount || 0) - audio0;
+            const frames = q ? q.totalVideoFrames - frames0 : 0;
+            hop.health =
+              (moved > 0.2 ? `adv${moved.toFixed(1)}s` : "STUCK") +
+              `:f${frames}` +
+              (q && q.droppedVideoFrames ? `/${q.droppedVideoFrames}d` : "") +
+              (audio > 0 ? `:a${Math.round(audio / 1024)}k` : ":NOAUDIO") +
+              (b.videoWidth ? "" : ":NOPIC") +
+              (b.muted || b.volume === 0 ? ":MUTE" : "") +
+              (b.paused ? ":PAUSED" : "") +
+              (sawAd ? ":AD" : "");
+            publishHops();
+          } catch {
+            /* reporting only */
+          }
+        }, 1000);
+      }, 5000);
+    }
+
     const logHop = () => {
       const ls = marks.loadstart;
       const meta = marks.loadedmetadata;
@@ -189,21 +289,8 @@
         hidden: hiddenEver ? 1 : 0,
       });
       if (hops.length > LOG_MAX) hops.shift();
-      try {
-        // Compact on purpose: this is read as text from the page.
-        root.setAttribute(
-          "data-ytac-hops",
-          hops
-            .slice(-12)
-            .map(
-              (h) =>
-                `${h.n}:${h.id}:${h.play}ms:gap${h.gap}:${h.sched}:${h.media}:${h.stalls}:h${h.hidden}`,
-            )
-            .join(" | "),
-        );
-      } catch {
-        /* reporting only */
-      }
+      publishHops();
+      watchHealth(hops[hops.length - 1]);
     };
 
     /**
@@ -298,6 +385,7 @@
           stalls: `${stalls ? `stall${stalls}/${stallWorst}ms` : ""}${resets ? `reset${resets}@${resetAt}ms` : ""}`,
           hidden: hiddenEver ? 1 : 0,
         });
+        publishHops();
       }
       currentId = id;
       marks = Object.create(null);
