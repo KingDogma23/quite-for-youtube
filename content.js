@@ -169,6 +169,70 @@
       return diff.join(",") || "none";
     };
 
+    /**
+     * A day's worth of hops, not the last twelve.
+     *
+     * The hop log lives in a page attribute, so it dies on every page load and
+     * holds twelve entries. Adverts are occasional — twelve clicked hops
+     * produced none — so answering "do the hops carrying adSlots show ads"
+     * needs a record spanning hours, gathered from whichever tab the viewer
+     * actually used rather than the one instrumented for a test.
+     *
+     * chrome.storage is shared by every tab's content script, so the history
+     * accumulates from all of them, and is mirrored back onto the page so it
+     * can be read without opening the extension.
+     */
+    const HISTORY_KEY = "ytacHistory";
+    const HISTORY_MAX = 400;
+    let historyChain = Promise.resolve();
+
+    function remember(hop) {
+      if (!contextAlive()) return;
+      historyChain = historyChain
+        .then(
+          () =>
+            new Promise((done) => {
+              chrome.storage.local.get({ [HISTORY_KEY]: [] }, (got) => {
+                // Serialised: concurrent hops each doing get-then-set lose
+                // entries, which is how the cookie extension's log quietly
+                // dropped its own readings under load.
+                const log = got[HISTORY_KEY] || [];
+                log.push(
+                  [
+                    new Date().toISOString().slice(11, 19),
+                    hop.id,
+                    hop.play === null ? "abandoned" : `${hop.play}ms`,
+                    hop.sched || "-",
+                    hop.health || "-",
+                  ].join("|"),
+                );
+                chrome.storage.local.set(
+                  { [HISTORY_KEY]: log.slice(-HISTORY_MAX) },
+                  () => done(),
+                );
+              });
+            }),
+        )
+        .catch(() => {});
+    }
+
+    function mirrorHistory() {
+      if (!contextAlive()) return;
+      try {
+        chrome.storage.local.get({ [HISTORY_KEY]: [] }, (got) => {
+          try {
+            const log = got[HISTORY_KEY] || [];
+            root.setAttribute("data-ytac-history-n", String(log.length));
+            root.setAttribute("data-ytac-history", log.join(" ~ "));
+          } catch {
+            /* reporting only */
+          }
+        });
+      } catch {
+        /* reporting only */
+      }
+    }
+
     function publishHops() {
       try {
         // Compact on purpose: this is read as text from the page.
@@ -262,12 +326,21 @@
               (b.paused ? ":PAUSED" : "") +
               (sawAd ? ":AD" : "");
             publishHops();
+            remember(hop);
+            mirrorHistory();
           } catch {
             /* reporting only */
           }
         }, 1000);
       }, 5000);
     }
+
+    // Mirror once on load, and periodically. The first version only mirrored
+    // after a hop completed, so a feed page — or any page where nothing was
+    // watched — carried no history attribute at all, and a reader defaulting a
+    // missing attribute to "0" reported an empty day when the day was recorded.
+    mirrorHistory();
+    setInterval(mirrorHistory, 30000);
 
     const logHop = () => {
       const ls = marks.loadstart;
@@ -290,7 +363,17 @@
       });
       if (hops.length > LOG_MAX) hops.shift();
       publishHops();
-      watchHealth(hops[hops.length - 1]);
+      const hop = hops[hops.length - 1];
+      watchHealth(hop);
+      // A hop the viewer leaves before six seconds never gets a health reading,
+      // and those are worth keeping too — recorded here, overwritten above if
+      // the reading does arrive.
+      setTimeout(() => {
+        if (!hop.health) {
+          remember(hop);
+          mirrorHistory();
+        }
+      }, 9000);
     };
 
     /**

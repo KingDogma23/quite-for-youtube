@@ -211,6 +211,7 @@
       //   (default)           leave adSlots alone
       //   ?ytacslots=undef    the getter; stalls, kept for re-testing
       //   ?ytacslots=delete   delete the key; stalls the same way
+      //   ?ytacslots=empty    an empty array; removes the ad, stalls 9s
       if (key === "adSlots") {
         if (slotsMode === "keep") continue;
         // ?ytacslots=empty — an EMPTY ARRAY rather than nothing.
@@ -220,8 +221,22 @@
         // waiting for an ad; the media server is refusing the playback
         // request. That request's context is built from the player response,
         // so a missing adSlots may simply make it malformed. An empty array
-        // is well-formed and still carries no ads. Untested — the ad-serving
-        // window closed before it could be run.
+        // is well-formed and still carries no ads.
+        //
+        // TESTED 2026-08-28, on a video that serves an ad every time
+        // (CZPklgZ5Tqs), window foregrounded, both arms valid:
+        //
+        //   ?ytacslots=empty   first frame 10,053ms   no ad
+        //   ?ytacslots=keep     first frame  1,345ms   ad played
+        //
+        // So the empty array DOES remove the ad and DOES stall, by nine
+        // seconds — the same stall class as delete and undef. The malformed-
+        // context theory is wrong: a well-formed empty array stalls just as
+        // hard. All three ways of touching adSlots cost the load.
+        //
+        // uBlock Origin blocks the same ad on the same video with no stall at
+        // all (266ms, measured the same afternoon), so whatever it does, it is
+        // not this. That is the lead worth following, and it is not adSlots.
         if (slotsMode === "empty") {
           try {
             Object.defineProperty(payload, key, {

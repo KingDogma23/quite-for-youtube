@@ -1,7 +1,12 @@
 # Chrome Web Store submission — Quite for YouTube™
 
 Publisher: **Quite Apps**  ·  Contact: **support@quiteapps.co.uk**
+Source: **github.com/KingDogma23/quite-for-youtube**
 Package: `dist/yt-ad-cleaner-<version>-store.zip` (built with `./package.sh --store`)
+
+> The zip is named from the working directory, which is still `yt-ad-cleaner` while
+> the repository is `quite-for-youtube`. Harmless, but do not let it read as a
+> different extension from the one being submitted.
 
 ## Summary (132 characters max)
 
@@ -71,11 +76,24 @@ Select: **does not collect or use user data.**
 
 - Screenshots, 1280x800, in `store/screenshots/`:
   - `01-ads-out-of-youtube.png`
-  - `02-no-account-no-tracking.png`
+  - `02-stopped-at-source.png`
+  - `03-no-account-no-tracking.png`
 - 128x128 icon — already in the package
-- Optional 440x280 small promo tile — not made
+- `store/promo-tile-440x280.png`
+- `store/marquee-1400x560.png`
 
-The screenshots show the real popup, rendered from the shipped popup.html with
-the extension's own default options ticked. The counters read zero because
-that is what a fresh install shows; inventing numbers for a store listing
-would be a lie told to everyone who reads it.
+All three are drawn from the same generator as the other Quite Apps listings
+(`tools/make-shots.py` in the website project), so the three extensions present
+as one publisher. Each shows the popup in a different real state — the default
+options, everything on, and the pared-back set — rather than the same picture
+three times.
+
+READ THIS BEFORE SUBMITTING. Earlier versions of these screenshots showed a
+fresh install's zeros, and this document said that inventing numbers would be a
+lie told to everyone who reads it. That is still true. The counters now read
+1,284 ads stopped / 3h 41m saved / 412 skipped, and those figures are
+ILLUSTRATIVE, not measured — they are the placeholders carried in the website's
+`data/extensions.json`. The extension already reports real totals in its own
+diagnostics, so replace them with a genuine reading before this listing goes
+live: update `stats` for `quite-for-youtube` in `data/extensions.json` and
+re-run the generator.
