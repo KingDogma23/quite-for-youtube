@@ -184,10 +184,38 @@
      */
     const HISTORY_KEY = "ytacHistory";
     const HISTORY_MAX = 400;
+
+    /**
+     * Off unless asked for.
+     *
+     * This record contains the video id and timestamp of every hop, which is a
+     * viewing history. It was built to answer a question about adverts on one
+     * machine, with the owner's knowledge. Shipping it on by default would mean
+     * an extension whose listing says it collects nothing quietly keeping four
+     * hundred entries of what its users watched.
+     *
+     * ?ytachistory=1 turns it on for the browser session — storage.session
+     * clears itself when Chrome closes, so it cannot be left on by accident.
+     */
+    let historyOn = false;
+    if (contextAlive()) {
+      try {
+        if (location.search.indexOf("ytachistory=1") !== -1) {
+          historyOn = true;
+          chrome.storage.session.set({ ytacHistoryOn: true });
+        } else {
+          chrome.storage.session.get({ ytacHistoryOn: false }, (got) => {
+            historyOn = !!got.ytacHistoryOn;
+          });
+        }
+      } catch {
+        /* stays off */
+      }
+    }
     let historyChain = Promise.resolve();
 
     function remember(hop) {
-      if (!contextAlive()) return;
+      if (!historyOn || !contextAlive()) return;
       historyChain = historyChain
         .then(
           () =>
