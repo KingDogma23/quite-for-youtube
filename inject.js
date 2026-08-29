@@ -95,6 +95,36 @@
 (() => {
   "use strict";
 
+  // ?ytacnorewrite=1 disables the RESPONSE REWRITING only — the cold-load
+  // neutralise and the fetch/XHR rename. It must not stand the whole file down;
+  // ?ytacoff=1 and ?ytacnoinject=1 already do that. 0.31.4 wired it into off(),
+  // which is the master bypass, so the A/B arm run on 2026-08-29 measured
+  // "inject.js entirely off" while claiming to measure "rewrite off".
+  const NO_REWRITE = location.search.indexOf("ytacnorewrite=1") !== -1;
+
+  // Published FIRST, before any switch can return early. This used to live in
+  // publish(), which the bypass below skips — so the report of which switch was
+  // in force disappeared exactly when a switch was in force, and that same A/B
+  // arm could not be validated from the report at all. A switch that cannot
+  // say it is on is the fault this project keeps paying for.
+  try {
+    const q = location.search;
+    document.documentElement.setAttribute(
+      "data-ytac-switches",
+      [
+        q.indexOf("ytacoff=1") !== -1 ? "off" : "",
+        NO_REWRITE ? "norewrite" : "",
+        q.indexOf("ytacnoinject=1") !== -1 ? "noinject" : "",
+        q.indexOf("ytacprune=1") !== -1 ? "prune" : "",
+        q.indexOf("ytacslots=") !== -1 ? "slots" : "",
+      ]
+        .filter(Boolean)
+        .join(",") || "none",
+    );
+  } catch {
+    /* reporting only */
+  }
+
   // The keys uBO names. adSlots is listed here but skipped by default — see
   // neutralise(). Adding a FOURTH key broke playback for six versions; do not
   // extend this list without measuring playback afterwards.
@@ -115,12 +145,9 @@
       // ?ytacoff=1 disables everything for one page load, so the same video can
       // be measured with this extension on and off. Diagnostic only.
       if (location.search.indexOf("ytacoff=1") !== -1) return true;
-      // ?ytacnorewrite=1 must disable BOTH rewrite paths. It was read only by
-      // the fetch/XHR interceptor further down this file, so a control arm run
-      // with the switch on still stripped the cold-load payload and reported
-      // "cold-load 1, fetch=0,xhr=0" — half the treatment left in, silently.
-      // Measured 2026-08-29 on 0.31.3, on the arm it was meant to control.
-      if (location.search.indexOf("ytacnorewrite=1") !== -1) return true;
+      // ytacnorewrite is deliberately NOT checked here: this function is the
+      // master bypass, and gating it on a rewrite-only switch turned that arm
+      // into a whole-file bypass. It is applied at the two rewrite sites.
       const root = document.documentElement;
       return (
         root.hasAttribute("data-ytac-all-off") || root.hasAttribute("data-ytac-strip-off")
@@ -133,22 +160,6 @@
   function publish() {
     try {
       document.documentElement.setAttribute("data-ytac-rewrites", String(neutralised));
-      // Switches report themselves. A bypass that quietly fails to bypass has
-      // cost this project days; every reading now carries what was actually in
-      // force when it was taken, so an invalid arm is visible in the report
-      // rather than inferred afterwards from a counter that looks wrong.
-      const q = location.search;
-      document.documentElement.setAttribute(
-        "data-ytac-switches",
-        [
-          q.indexOf("ytacoff=1") !== -1 ? "off" : "",
-          q.indexOf("ytacnorewrite=1") !== -1 ? "norewrite" : "",
-          q.indexOf("ytacprune=1") !== -1 ? "prune" : "",
-          q.indexOf("ytacslots=") !== -1 ? "slots" : "",
-        ]
-          .filter(Boolean)
-          .join(",") || "none",
-      );
     } catch {
       /* reporting must never break playback */
     }
@@ -215,7 +226,7 @@
 
   /** Make one response's ad fields read as undefined, without deleting them. */
   function neutralise(payload) {
-    if (off() || !isPlayerPayload(payload)) return false;
+    if (off() || NO_REWRITE || !isPlayerPayload(payload)) return false;
     recordSchedule(payload);
     let hit = false;
     for (const key of AD_KEYS) {
@@ -484,7 +495,9 @@
   const PRUNE_KEYS = ["adPlacements", "playerAds", "adSlots"];
   let rewrites = { fetch: 0, xhr: 0 };
 
-  const noRewrite = location.search.indexOf("ytacnorewrite=1") !== -1;
+  // Same flag as the cold-load path above, read once at the top of the file.
+  // Two independent reads of the same switch is how they came to disagree.
+  const noRewrite = NO_REWRITE;
 
   function publishRewrites() {
     try {
@@ -496,6 +509,14 @@
       /* reporting only */
     }
   }
+
+  // Published once at zero, before anything can rewrite. Under ?ytacnorewrite=1
+  // the interceptor is never installed, so this attribute was simply ABSENT and
+  // a report could not tell "nothing was rewritten" from "nothing was measured".
+  // That is the same fault as the switch reporting fixed above, one level down:
+  // verified on the live site 2026-08-29, where the norewrite arm returned
+  // rewrote=null while the cold-load counter correctly returned "0".
+  publishRewrites();
 
   /** Returns the patched body, or null when there was nothing to rename. */
   function renameAdKeys(text) {
