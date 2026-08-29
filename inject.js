@@ -115,6 +115,12 @@
       // ?ytacoff=1 disables everything for one page load, so the same video can
       // be measured with this extension on and off. Diagnostic only.
       if (location.search.indexOf("ytacoff=1") !== -1) return true;
+      // ?ytacnorewrite=1 must disable BOTH rewrite paths. It was read only by
+      // the fetch/XHR interceptor further down this file, so a control arm run
+      // with the switch on still stripped the cold-load payload and reported
+      // "cold-load 1, fetch=0,xhr=0" — half the treatment left in, silently.
+      // Measured 2026-08-29 on 0.31.3, on the arm it was meant to control.
+      if (location.search.indexOf("ytacnorewrite=1") !== -1) return true;
       const root = document.documentElement;
       return (
         root.hasAttribute("data-ytac-all-off") || root.hasAttribute("data-ytac-strip-off")
@@ -127,6 +133,22 @@
   function publish() {
     try {
       document.documentElement.setAttribute("data-ytac-rewrites", String(neutralised));
+      // Switches report themselves. A bypass that quietly fails to bypass has
+      // cost this project days; every reading now carries what was actually in
+      // force when it was taken, so an invalid arm is visible in the report
+      // rather than inferred afterwards from a counter that looks wrong.
+      const q = location.search;
+      document.documentElement.setAttribute(
+        "data-ytac-switches",
+        [
+          q.indexOf("ytacoff=1") !== -1 ? "off" : "",
+          q.indexOf("ytacnorewrite=1") !== -1 ? "norewrite" : "",
+          q.indexOf("ytacprune=1") !== -1 ? "prune" : "",
+          q.indexOf("ytacslots=") !== -1 ? "slots" : "",
+        ]
+          .filter(Boolean)
+          .join(",") || "none",
+      );
     } catch {
       /* reporting must never break playback */
     }

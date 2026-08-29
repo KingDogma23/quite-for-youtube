@@ -60,13 +60,18 @@ function render(d, stored) {
   const on = $("enabled").checked;
   $("stateText").textContent = on ? "Protection on" : "Protection off";
   $("stateSub").textContent = on
-    ? "Ads removed before they load"
+    ? "Ads skipped as they appear"
     : "YouTube is showing you everything";
 
   // Totals first, from whichever source has them: they are all-time figures and
   // do not depend on which tab is open.
   const lt = d?.lifetime || stored || { adsBlocked: 0, secondsSaved: 0, adsSkipped: 0 };
-  $("sAds").textContent = compact(lt.adsBlocked || 0);
+  // "Videos protected" was removed from the headline on 2026-08-29. It counted
+  // videos where a rewrite fired and no ad appeared, which a control run showed
+  // is dominated by videos that carried no ad in the first place: five videos
+  // with the rewrite DISABLED produced zero ads. adsBlocked and leaked are still
+  // recorded and still appear in the diagnostics report, where their confound
+  // can be stated; they are not a number to put in front of a user as a result.
   $("sTime").textContent = humanTime(lt.secondsSaved);
   $("sClean").textContent = compact(lt.adsSkipped || 0);
 
@@ -87,10 +92,13 @@ function render(d, stored) {
   const reached = s.videoAdsSkipped + s.videoAdsSeeked;
   lastReport = [
     `Quite for YouTube v${d.version}  (page ${d.url})`,
-    `all time: ${lt.adsBlocked} ads stopped, ${humanTime(lt.secondsSaved)} saved, ` +
+    `all time: ${lt.adsBlocked} videos protected, ${lt.leaked ?? 0} leaked ` +
+    `(rewrite fired, ad played anyway), ${humanTime(lt.secondsSaved)} saved, ` +
       `${lt.adsSkipped || 0} ads skipped`,
     `on: ${Object.entries(d.settings).filter(([, v]) => v).map(([k]) => k).join(", ") || "nothing"}`,
-    `ad payloads neutralised: ${d.rewrites ?? 0}   (0 means ads are NOT being removed)`,
+    `ad payloads neutralised: cold-load ${d.rewrites ?? 0}, ${d.rewrote ?? "fetch=0,xhr=0"}`,
+    `  (a clicked video uses the fetch path, where cold-load 0 is normal)`,
+    `diagnostic switches in force: ${d.switches ?? "unknown"}`,
     `video ads reaching playback: ${reached} ` +
       `(${s.videoAdsSkipped} skipped, ${s.spedUp ?? 0} sped up, ${s.videoAdsSeeked} seeked)`,
     `anti-adblock wall on screen: ${d.walled ? "YES" : "no"}`,
@@ -99,6 +107,9 @@ function render(d, stored) {
       ? `feed ads: ${d.page.feedAds.inDom} in DOM, ${d.page.feedAds.stillVisible} still visible`
       : `feed ads: unavailable — the page is running an OLDER content script than ` +
         `this popup. Reload the extension, then reload YouTube.`,
+    `real videos hidden by our own rules: ${d.page.swallowed ?? "unknown"}   (should always be none)`,
+    `reading validity: tab hidden now=${d.hiddenNow ?? "?"}, ever hidden=${d.hiddenEver ?? "?"}` +
+      `${d.hiddenNow === "1" ? "   <-- VOID, foreground the tab and re-read" : ""}`,
     `page: player=${d.page.playerFound} adNow=${d.page.adPlayingNow}`,
     `ad sightings captured: ${s.adSightings?.length ?? 0}`,
     s.firstAdSeen
@@ -137,7 +148,7 @@ $("copy").addEventListener("click", async (e) => {
 
 $("reset").addEventListener("click", (e) => {
   chrome.storage.local.set({
-    quietLifetime: { adsBlocked: 0, secondsSaved: 0, adsSkipped: 0, since: Date.now() },
+    quietLifetime: { adsBlocked: 0, leaked: 0, secondsSaved: 0, adsSkipped: 0, since: Date.now() },
   });
   e.target.textContent = "Reset";
   setTimeout(() => {

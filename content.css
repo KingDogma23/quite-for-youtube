@@ -19,7 +19,15 @@
 html:not([data-ytac-feed-off]) ytd-rich-item-renderer:has(> #content > ytd-ad-slot-renderer),
 html:not([data-ytac-feed-off]) #contents > ytd-rich-item-renderer:has(> ytd-ad-slot-renderer),
 html:not([data-ytac-feed-off]) ytd-rich-section-renderer:has(ytd-ad-slot-renderer),
-html:not([data-ytac-feed-off]) ytd-item-section-renderer:has(> #contents > ytd-ad-slot-renderer),
+/* Guarded with :not(:has(... > *:not(ytd-ad-slot-renderer))) — hide the section
+   only when it contains NOTHING but ad slots.
+   Measured on live YouTube 2026-08-29: the watch-page sidebar puts all related
+   videos in ONE ytd-item-section-renderer > #contents, and YouTube drops the
+   sidebar ad in beside them. The unguarded rule therefore matched that section
+   and hid 24 real videos with it — the "videos list on the right disappears on
+   some videos" fault. The ad itself is still caught by the bare
+   ytd-ad-slot-renderer backstop below, so the guard costs a gap at worst. */
+html:not([data-ytac-feed-off]) ytd-item-section-renderer:has(> #contents > ytd-ad-slot-renderer):not(:has(> #contents > *:not(ytd-ad-slot-renderer))),
 html:not([data-ytac-feed-off]) #shorts-inner-container > .ytd-shorts:has(> .ytd-reel-video-renderer > ytd-ad-slot-renderer),
 
 /* --- watch-page sidebar and companion slots, parent included so the

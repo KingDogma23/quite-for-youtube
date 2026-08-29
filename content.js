@@ -123,6 +123,15 @@
         // Any reading taken while this says 1 is void. Foreground the tab and
         // measure again.
         root.setAttribute("data-ytac-hidden", hiddenEver ? "1" : "0");
+        // EVER hidden and hidden RIGHT NOW are different questions, and only
+        // publishing the first made every reading after one backgrounding look
+        // void. Measured 2026-08-29: data-ytac-hidden read 1 on a foreground
+        // tab whose readings were fine. A validity flag that never clears gets
+        // ignored, and then it protects nothing.
+        root.setAttribute(
+          "data-ytac-hidden-now",
+          document.visibilityState === "hidden" ? "1" : "0",
+        );
         // Which video in the session these figures belong to. 0 is the cold
         // load; anything higher came from clicking.
         root.setAttribute("data-ytac-nav", String(navCount));
@@ -690,7 +699,7 @@
   // are not mistaken for the same "video".
   const currentVideoId = () =>
     (location.search.match(/[?&]v=([\w-]{11})/) || [])[1] || location.pathname;
-  let lifetime = { adsBlocked: 0, secondsSaved: 0, adsSkipped: 0, since: null, blockedFixed: false };
+  let lifetime = { adsBlocked: 0, leaked: 0, secondsSaved: 0, adsSkipped: 0, since: null, blockedFixed: false };
   let lifetimeDirty = false;
 
   function loadLifetime() {
@@ -727,7 +736,13 @@
    * credited by creditStoppedSchedules(), which watches a different event
    * entirely: ads stopped before they ever reached the player.
    */
+  // Declared above its first use in recordAd(): `let` has a temporal dead
+  // zone, so a declaration further down the file throws if an ad is recorded
+  // during init rather than merely reading as undefined.
+  let vid = { id: null, rewrote: false, adSeen: false };
+
   function recordAd(seconds) {
+    vid.adSeen = true;
     lifetime.adsSkipped = (lifetime.adsSkipped || 0) + 1;
     if (Number.isFinite(seconds) && seconds > 0 && seconds < 600) {
       lifetime.secondsSaved += seconds;
@@ -751,22 +766,65 @@
    * what the "Videos protected" label promises.
    */
   let lastRewrites = 0;
-  let creditedVideo = null;
 
-  function creditStoppedSchedules() {
-    const n = Number(
-      document.documentElement.getAttribute("data-ytac-rewrites") || 0,
+  /**
+   * Neutralisations across EVERY path. Reading data-ytac-rewrites alone was why
+   * this credited nothing: that attribute counts cold loads, and a CLICKED video
+   * is rewritten on the fetch path, which publishes to data-ytac-rewrote. The
+   * counter was blind to the only path Martin actually uses. Measured 2026-08-29
+   * on 0.31.1: fetch=3 neutralised, 0 videos credited.
+   */
+  function totalRewrites() {
+    const root = document.documentElement;
+    const cold = Number(root.getAttribute("data-ytac-rewrites") || 0);
+    const net = String(root.getAttribute("data-ytac-rewrote") || "").match(
+      /\d+/g,
     );
-    if (!Number.isFinite(n)) return;
-    const rose = n > lastRewrites;
-    lastRewrites = n;
-    if (!rose) return;
-    const id = currentVideoId();
-    if (id === creditedVideo) return;
-    creditedVideo = id;
-    lifetime.adsBlocked = (lifetime.adsBlocked || 0) + 1;
+    const sum = (net || []).reduce((a, b) => a + Number(b), 0);
+    return (Number.isFinite(cold) ? cold : 0) + sum;
+  }
+
+  /**
+   * Per-video verdict, settled against what was WITNESSED.
+   *
+   * A neutralised payload is not proof an ad was stopped. The same 0.31.1
+   * session recorded fetch=3 neutralisations and 19 ads reaching playback, so
+   * crediting on the rewrite alone would build a counter that flatters — the
+   * exact fault this file has now shipped twice. Each video is therefore settled
+   * on the way out:
+   *
+   *   rewrote && !adSeen  -> protected  (the only claim we are entitled to make)
+   *   rewrote &&  adSeen  -> leaked     (rewrite fired, the ad played anyway)
+   *
+   * Both are stored. If "leaked" outruns "protected", the response rewrite is
+   * not doing the job the store summary claims, and the summary is what changes.
+   *
+   * Settling happens when the video id changes, which is the common case here
+   * (clicking on from a watch page). A tab closed mid-video may lose its last
+   * verdict to the 5s storage flush; that undercounts both sides equally and is
+   * not worth a synchronous write to fix.
+   */
+
+  function settleVideo() {
+    if (!vid.id || !vid.rewrote) return;
+    if (vid.adSeen) lifetime.leaked = (lifetime.leaked || 0) + 1;
+    else lifetime.adsBlocked = (lifetime.adsBlocked || 0) + 1;
     lifetimeDirty = true;
   }
+
+  function creditStoppedSchedules() {
+    const id = currentVideoId();
+    if (id !== vid.id) {
+      settleVideo();
+      vid = { id, rewrote: false, adSeen: false };
+    }
+    const n = totalRewrites();
+    if (!Number.isFinite(n)) return;
+    if (n > lastRewrites) vid.rewrote = true;
+    lastRewrites = n;
+  }
+
+  addEventListener("pagehide", settleVideo);
 
   // Batched: writing on every ad would hammer storage during a long session.
   timers.push(
@@ -1194,6 +1252,18 @@
         rewrites: Number(
           document.documentElement.getAttribute("data-ytac-rewrites") || 0
         ),
+        // The cold-load counter above is not the whole story, and reporting it
+        // alone has misled twice now. data-ytac-rewrote counts the fetch and XHR
+        // path — where a CLICKED video goes, and where the cold-load counter is
+        // legitimately zero. Read both or neither.
+        rewrote:
+          document.documentElement.getAttribute("data-ytac-rewrote") || "fetch=0,xhr=0",
+        switches:
+          document.documentElement.getAttribute("data-ytac-switches") || "none",
+        hiddenNow:
+          document.documentElement.getAttribute("data-ytac-hidden-now") || "?",
+        hiddenEver:
+          document.documentElement.getAttribute("data-ytac-hidden") || "?",
         strategy:
           document.documentElement.getAttribute("data-ytac-strategy") || "none yet",
         walled: /Ad blockers violate/i.test(document.body?.innerText || ""),
@@ -1218,6 +1288,58 @@
               if (r.width > 0 && r.height > 0) visible++;
             }
             return { inDom: els.length, stillVisible: visible };
+          })(),
+          // Container rules hide a whole section so no empty gap is left, which
+          // is only safe while the section holds nothing but ads. On 2026-08-29
+          // the ytd-item-section-renderer rule was measured hiding the watch
+          // sidebar with 24 real videos inside it, and nothing reported that —
+          // it surfaced as "the videos list disappeared". This counts what our
+          // OWN rules are swallowing, so a recurrence arrives as a number.
+          swallowed: (() => {
+            // A hidden subtree swallowed content if it holds a link to a real
+            // video that is not part of an ad. Counting VIDEO IDS, not elements
+            // or links: one search result carries several links, and a link
+            // count reported 108 on a 24-result page during the red team.
+            //
+            // The list below is every rule in content.css that hides something
+            // larger than the ad itself. It was three; a red team on 2026-08-29
+            // found the other four unwatched, so a swallow by any of them would
+            // have been reported as "none" — the instrument unable to report
+            // the one fault it exists for.
+            const CONTAINERS = [
+              "ytd-item-section-renderer:has(> #contents > ytd-ad-slot-renderer):not(:has(> #contents > *:not(ytd-ad-slot-renderer)))",
+              "ytd-rich-section-renderer:has(ytd-ad-slot-renderer)",
+              "ytd-engagement-panel-section-list-renderer:has(ytd-ad-slot-renderer)",
+              "ytd-rich-item-renderer:has(> #content > ytd-ad-slot-renderer)",
+              "#contents > ytd-rich-item-renderer:has(> ytd-ad-slot-renderer)",
+              "ytd-compact-video-renderer:has(ytd-ad-slot-renderer)",
+              "#shorts-inner-container > .ytd-shorts:has(> .ytd-reel-video-renderer > ytd-ad-slot-renderer)",
+            ];
+            const idsIn = (el) => {
+              const found = [];
+              for (const a of el.querySelectorAll(
+                'a[href*="/watch?v="], a[href^="/shorts/"]',
+              )) {
+                if (a.closest("ytd-ad-slot-renderer, ad-slot-renderer")) continue;
+                const m = (a.getAttribute("href") || "").match(
+                  /(?:v=|\/shorts\/)([\w-]{6,})/,
+                );
+                if (m) found.push(m[1]);
+              }
+              return found;
+            };
+            const hits = [];
+            for (const sel of CONTAINERS) {
+              const seen = new Set();
+              try {
+                for (const el of document.querySelectorAll(sel))
+                  for (const id of idsIn(el)) seen.add(id);
+              } catch {
+                continue;
+              }
+              if (seen.size) hits.push(`${sel.split(":")[0].trim()}=${seen.size}`);
+            }
+            return hits.length ? hits.join(" ") : "none";
           })(),
         },
       });
