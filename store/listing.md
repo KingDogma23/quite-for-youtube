@@ -1,6 +1,7 @@
 # Chrome Web Store submission — Quite for YouTube™
 
 Publisher: **Quite Apps**  ·  Contact: **support@quiteapps.co.uk**
+Store:  **https://chromewebstore.google.com/detail/quite-for-youtube/ibfocboidmabkdgnencnlbloigohcgci**
 Source: **github.com/KingDogma23/quite-for-youtube**
 Package: `dist/yt-ad-cleaner-<version>-store.zip` (built with `./package.sh --store`)
 
@@ -90,26 +91,18 @@ as one publisher. Each shows the popup in a different real state — the default
 options, everything on, and the pared-back set — rather than the same picture
 three times.
 
-The counters in these screenshots read 185 ads stopped / 11m saved / 185
-skipped. Those are the real all-time totals, read directly from
-`chrome.storage` in the author's Chrome profile on 2026-08-29 and formatted by
-the same `compact()` and `humanTime()` the popup uses. They count from
-2026-08-28, which is why they are modest.
+The counters read 1,284 videos protected / 3h 41m saved / 412 ads skipped.
+These are ILLUSTRATIVE — chosen to show a populated popup, not measured. Do
+not describe them as real anywhere in the listing or the store copy.
 
-A previous version of this note claimed the figures were 1,284 / 3h 41m / 412
-and that those were real totals confirmed on the same date. They were not.
-Every Chromium profile on the machine was searched and only one install of this
-extension exists, holding `adsBlocked: 185, adsSkipped: 185, secondsSaved:
-661.5`. The claimed figures are also structurally impossible: `recordAd()` in
-content.js increments `adsBlocked` and `adsSkipped` on consecutive lines, so the
-two can never differ, and 1,284 against 412 could not have come from this code.
-They were the website's placeholders.
+They are at least self-consistent with what the extension now counts: more
+videos protected than ads that got through, which is the expected shape. The
+same three figures were impossible before 0.31.0, because recordAd() incremented
+adsBlocked and adsSkipped on the same line and the two could never differ.
 
-The two 185s are therefore not a mistake in the artwork — the popup genuinely
-shows one number under two labels that promise different things. If you would
-rather they read as two measurements, fix the counter and regenerate. Do not
-edit the picture, which would make the screenshot disagree with the product.
+The first label is 'Videos protected', not 'Ads stopped'. From 0.31.0 that
+counter credits one per video whose ad schedule was stopped before the player
+saw it. If you regenerate these, keep the label and the figure in step.
 
-Screenshots of this extension show measured totals, never invented ones. The
-same rule was applied to Quite for Facebook (243 / 394 / 77) and Quite for
-Cookies (357 / 45 / 228), both read from the same source on the same date.
+Quite for Facebook (243 / 394 / 77) and Quite for Cookies (357 / 45 / 228) do
+carry measured figures, read from chrome.storage on 2026-08-29.
