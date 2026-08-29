@@ -15,7 +15,9 @@ Shorts ad panels. No accounts, no tracking.
 
 ## Description
 
-Quite for YouTube takes the ads out of YouTube and does nothing else.
+Quite for YouTube is a YouTube ad blocker that does one job. It stops most video
+ads loading, skips or fast-forwards the ones that still appear, and hides the ad
+panels in the feed, sidebar, search results and Shorts. It does nothing else.
 
 - Video ads: Skip is clicked as soon as it appears, and unskippable ads are
   fast-forwarded.

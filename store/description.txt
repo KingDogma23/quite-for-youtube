@@ -1,0 +1,14 @@
+Quite for YouTube is a YouTube ad blocker that does one job. It stops most video ads loading, skips or fast-forwards the ones that still appear, and hides the ad panels in the feed, sidebar, search results and Shorts. It does nothing else.
+
+- Video ads: Skip is clicked as soon as it appears, and unskippable ads are fast-forwarded.
+- Feed, sidebar, search and Shorts ad panels are hidden before they paint, so the page does not jump as they disappear.
+- Banner overlays on top of the video are dismissed.
+- Merch shelves under videos can be hidden too (off by default).
+
+Every option can be switched off individually, and the whole extension has a single on/off switch.
+
+It runs only on youtube.com. It has no account, no server and no analytics, and it never sends anything anywhere. The only thing it stores is which of the checkboxes you have ticked.
+
+YouTube changes its player regularly. When that happens some skipping can stop working until the extension is updated — the extension is built to fail towards "an ad gets through" rather than towards a broken video.
+
+YouTube™ is a trademark of Google LLC. This extension is an independent project and is not affiliated with, endorsed by or sponsored by Google LLC.
