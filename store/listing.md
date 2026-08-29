@@ -90,17 +90,26 @@ as one publisher. Each shows the popup in a different real state — the default
 options, everything on, and the pared-back set — rather than the same picture
 three times.
 
-The counters in these screenshots read 1,284 ads stopped / 3h 41m saved / 412
-skipped. Those are REAL — Martin's own all-time totals, read from the
-extension's popup and confirmed on 2026-08-29.
+The counters in these screenshots read 185 ads stopped / 11m saved / 185
+skipped. Those are the real all-time totals, read directly from
+`chrome.storage` in the author's Chrome profile on 2026-08-29 and formatted by
+the same `compact()` and `humanTime()` the popup uses. They count from
+2026-08-28, which is why they are modest.
 
-An earlier version of this note called them illustrative placeholders carried
-from the website's `data/extensions.json`, and told whoever submitted the
-listing to replace them with a genuine reading first. That was wrong: they were
-his actual totals all along. The instruction is removed rather than left in
-place, because following it would have meant replacing true numbers with
-invented ones — the exact thing it was written to prevent.
+A previous version of this note claimed the figures were 1,284 / 3h 41m / 412
+and that those were real totals confirmed on the same date. They were not.
+Every Chromium profile on the machine was searched and only one install of this
+extension exists, holding `adsBlocked: 185, adsSkipped: 185, secondsSaved:
+661.5`. The claimed figures are also structurally impossible: `recordAd()` in
+content.js increments `adsBlocked` and `adsSkipped` on consecutive lines, so the
+two can never differ, and 1,284 against 412 could not have come from this code.
+They were the website's placeholders.
 
-The principle it was protecting still holds. Screenshots of this extension show
-measured totals, never invented ones. The same rule was applied to Quite for
-Cookies, whose screenshots carry 357 / 45 / 228 from the same source.
+The two 185s are therefore not a mistake in the artwork — the popup genuinely
+shows one number under two labels that promise different things. If you would
+rather they read as two measurements, fix the counter and regenerate. Do not
+edit the picture, which would make the screenshot disagree with the product.
+
+Screenshots of this extension show measured totals, never invented ones. The
+same rule was applied to Quite for Facebook (243 / 394 / 77) and Quite for
+Cookies (357 / 45 / 228), both read from the same source on the same date.
