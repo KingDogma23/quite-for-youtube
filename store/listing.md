@@ -90,12 +90,17 @@ as one publisher. Each shows the popup in a different real state — the default
 options, everything on, and the pared-back set — rather than the same picture
 three times.
 
-READ THIS BEFORE SUBMITTING. Earlier versions of these screenshots showed a
-fresh install's zeros, and this document said that inventing numbers would be a
-lie told to everyone who reads it. That is still true. The counters now read
-1,284 ads stopped / 3h 41m saved / 412 skipped, and those figures are
-ILLUSTRATIVE, not measured — they are the placeholders carried in the website's
-`data/extensions.json`. The extension already reports real totals in its own
-diagnostics, so replace them with a genuine reading before this listing goes
-live: update `stats` for `quite-for-youtube` in `data/extensions.json` and
-re-run the generator.
+The counters in these screenshots read 1,284 ads stopped / 3h 41m saved / 412
+skipped. Those are REAL — Martin's own all-time totals, read from the
+extension's popup and confirmed on 2026-08-29.
+
+An earlier version of this note called them illustrative placeholders carried
+from the website's `data/extensions.json`, and told whoever submitted the
+listing to replace them with a genuine reading first. That was wrong: they were
+his actual totals all along. The instruction is removed rather than left in
+place, because following it would have meant replacing true numbers with
+invented ones — the exact thing it was written to prevent.
+
+The principle it was protecting still holds. Screenshots of this extension show
+measured totals, never invented ones. The same rule was applied to Quite for
+Cookies, whose screenshots carry 357 / 45 / 228 from the same source.
