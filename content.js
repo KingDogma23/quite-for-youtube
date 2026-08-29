@@ -685,7 +685,12 @@
    * estimated from an average.
    */
   const LIFETIME_KEY = "quietLifetime";
-  let lifetime = { adsBlocked: 0, secondsSaved: 0, adsSkipped: 0, since: null };
+
+  // The watch id, falling back to the path so two different non-watch pages
+  // are not mistaken for the same "video".
+  const currentVideoId = () =>
+    (location.search.match(/[?&]v=([\w-]{11})/) || [])[1] || location.pathname;
+  let lifetime = { adsBlocked: 0, secondsSaved: 0, adsSkipped: 0, since: null, blockedFixed: false };
   let lifetimeDirty = false;
 
   function loadLifetime() {
@@ -698,15 +703,68 @@
         lifetime.since = Date.now();
         lifetimeDirty = true;
       }
+      // Before 0.31.0 adsBlocked was incremented alongside adsSkipped, so every
+      // stored value is a copy of the skip count rather than a measurement of
+      // anything. Carrying it forward would leave the popup showing a number
+      // that was never true under a label that now means something specific.
+      // Zeroed once, and only once — `blockedFixed` marks the profile done, so
+      // a genuine count is never wiped by a later reload.
+      if (!lifetime.blockedFixed) {
+        lifetime.adsBlocked = 0;
+        lifetime.blockedFixed = true;
+        lifetimeDirty = true;
+      }
     });
   }
 
+  /**
+   * An ad that got through and was dealt with in the player.
+   *
+   * Both callers are that case — Skip was clicked, or the ad was
+   * fast-forwarded. This used to increment adsBlocked on the line above as
+   * well, so the two counters could never diverge and the popup showed one
+   * number under two labels that promise different things. adsBlocked is now
+   * credited by creditStoppedSchedules(), which watches a different event
+   * entirely: ads stopped before they ever reached the player.
+   */
   function recordAd(seconds) {
-    lifetime.adsBlocked++;
     lifetime.adsSkipped = (lifetime.adsSkipped || 0) + 1;
     if (Number.isFinite(seconds) && seconds > 0 && seconds < 600) {
       lifetime.secondsSaved += seconds;
     }
+    lifetimeDirty = true;
+  }
+
+  /**
+   * Videos whose ad schedule was stopped at source, before the player saw it.
+   *
+   * inject.js runs in the page and cannot reach chrome.storage, but it already
+   * publishes a monotonic count of neutralised player responses on
+   * data-ytac-rewrites. Read the RISE in that number rather than the number
+   * itself, so a count that was already there before this script started
+   * polling is still picked up.
+   *
+   * Credited once per video. One video can produce several neutralised
+   * responses — the client-identity retry is one, returning to the same watch
+   * page is another — and counting each would inflate the figure with work
+   * done twice on a single video. The unit is therefore the video, which is
+   * what the "Videos protected" label promises.
+   */
+  let lastRewrites = 0;
+  let creditedVideo = null;
+
+  function creditStoppedSchedules() {
+    const n = Number(
+      document.documentElement.getAttribute("data-ytac-rewrites") || 0,
+    );
+    if (!Number.isFinite(n)) return;
+    const rose = n > lastRewrites;
+    lastRewrites = n;
+    if (!rose) return;
+    const id = currentVideoId();
+    if (id === creditedVideo) return;
+    creditedVideo = id;
+    lifetime.adsBlocked = (lifetime.adsBlocked || 0) + 1;
     lifetimeDirty = true;
   }
 
@@ -1055,6 +1113,7 @@
     // and changes playbackRate, none of which a control arm may do.
     if (!settings.enabled || location.search.indexOf("ytacoff=1") !== -1) return;
     try {
+      creditStoppedSchedules();
       if (!adIsPlaying()) seekAttempts = 0; // ad break over; restore the budget
       revertFalseSeek();
       restoreSpeed();
