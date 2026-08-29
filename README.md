@@ -79,6 +79,13 @@ This is free and has no ads, no tracking and no accounts. If it saves you some
 irritation, you can [buy me a coffee](https://buymeacoffee.com/kingdogma23).
 It is an ordinary link — nothing is sent anywhere unless you click it.
 
+## Elsewhere
+
+- [quiteapps.co.uk](https://quiteapps.co.uk/) — the other extensions in the family
+- [facebook.com/quiteapps](https://www.facebook.com/quiteapps/) — where breakages get
+  announced. When the site this extension runs on changes its markup, the fix takes
+  hours and clearing store review takes days; that is where the gap gets explained.
+
 ## Licence
 
 MIT — see [LICENSE](LICENSE).
