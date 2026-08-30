@@ -188,8 +188,18 @@
      * actually used rather than the one instrumented for a test.
      *
      * chrome.storage is shared by every tab's content script, so the history
-     * accumulates from all of them, and is mirrored back onto the page so it
-     * can be read without opening the extension.
+     * accumulates from all of them.
+     *
+     * It used to be mirrored onto the page as data-ytac-history so it could be
+     * read without opening the extension. That was convenient for me and wrong
+     * for the user: it handed YouTube's own scripts — and any other extension
+     * on the page — up to four hundred entries of what had been watched, in one
+     * attribute, which is exactly the record someone who turns YouTube's watch
+     * history off has decided not to hand over. Worse, historyOn lives in
+     * storage.session and the log lives in storage.local, so after a restart
+     * the switch read off while the log was still there and still being
+     * published. Only the COUNT is published now. Nothing in this extension
+     * ever read the full attribute; it existed solely for reading off the DOM.
      */
     const HISTORY_KEY = "ytacHistory";
     const HISTORY_MAX = 400;
@@ -260,7 +270,10 @@
           try {
             const log = got[HISTORY_KEY] || [];
             root.setAttribute("data-ytac-history-n", String(log.length));
-            root.setAttribute("data-ytac-history", log.join(" ~ "));
+            // The log itself is deliberately NOT published — see above. Read it
+            // from chrome.storage.local under "ytacHistory" instead, which the
+            // page cannot reach.
+            root.removeAttribute("data-ytac-history");
           } catch {
             /* reporting only */
           }
@@ -1209,6 +1222,25 @@
     }
 
     tick();
+
+    // Chrome throttles setInterval in a hidden tab — to once a second, and in a
+    // heavily throttled tab once a MINUTE. The skip below runs on a 400ms tick,
+    // so an advert that appears while you are in another tab can sit unskipped
+    // for up to a minute, and is still sitting there when you come back. That is
+    // the shape of the complaint on 2026-08-29: an advert on screen with its
+    // Skip button already showing, on a report whose own validity line read
+    // hidden=1.
+    //
+    // Ticking on visibilitychange costs nothing and fires the moment the tab is
+    // looked at, instead of whenever the throttled timer next happens to run.
+    try {
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") tick();
+      });
+    } catch {
+      /* the timer below still covers it, just later */
+    }
+
     // A timer alone, deliberately.
     //
     // A MutationObserver over YouTube's document fires constantly, and each

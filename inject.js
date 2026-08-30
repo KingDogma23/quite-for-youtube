@@ -117,6 +117,8 @@
         q.indexOf("ytacnoinject=1") !== -1 ? "noinject" : "",
         q.indexOf("ytacprune=1") !== -1 ? "prune" : "",
         q.indexOf("ytacslots=") !== -1 ? "slots" : "",
+        q.indexOf("ytacfetchslots=1") !== -1 ? "fetchslots" : "",
+        q.indexOf("ytacshorts=1") !== -1 ? "shorts" : "",
       ]
         .filter(Boolean)
         .join(",") || "none",
@@ -475,6 +477,17 @@
   // returned untouched and unbuffered, which is the part the old blanket fetch
   // wrapper got wrong.
   const PLAYER_URL = /\/youtubei\/v1\/(player|get_watch)(\?|$)/;
+  // Shorts. uBO carries a dedicated rule for this endpoint and this file carried
+  // nothing, so Shorts adverts were never touched at all. A 50-Shorts run on
+  // 2026-08-29 saw zero adverts, which was read as "Shorts are clean" — with no
+  // positive control, that reading was worth nothing.
+  //
+  // uBO prunes reelWatchSequenceResponse...adClientParams.isAd. Flipping the
+  // flag to false is the rename-shaped equivalent: the key stays, so nothing
+  // downstream sees a missing property. Behind ?ytacshorts=1 until measured.
+  const REEL_URL = /\/reel_watch_sequence/;
+  const SHORTS_ON = location.search.indexOf("ytacshorts=1") !== -1;
+  const REEL_AD_RE = /"isAd"\s*:\s*true/g;
   // adSlots is NOT renamed. The cold-load path learned this in 0.17.5 —
   // taking that key away stalls the player — and the same lesson simply was
   // never applied to the fetch path, which is where clicking a video goes.
@@ -489,11 +502,31 @@
   // the videos where YouTube fills ad slots, on exactly the navigation path he
   // uses. adPlacements and playerAds are still renamed, and those are what
   // actually carry the ads that get removed.
-  const AD_KEY_RE = /"(adPlacements|playerAds)"/g;
+  //
+  // 2026-08-29, reading uBlock Origin's CURRENT rules rather than the technique:
+  // it renames adPlacements AND adSlots on this exact endpoint —
+  //   ||youtube.com/youtubei/v1/get_watch?$xhr,1p,replace=/"adSlots"/"no_ads"/
+  // and sets all three to undefined on the cold load. So the one key this file
+  // excludes is a key the maintained blocker includes.
+  //
+  // Re-reading the measurement above: the slow arm is "rewrite ON and the
+  // response CARRIES adSlots" — that is renaming the other two and leaving
+  // adSlots pointing at ad payloads that no longer exist. It is not a
+  // measurement of renaming adSlots, which was never tried on this path.
+  // ?ytacfetchslots=1 tries it, so the question can be settled by playback
+  // timings instead of by re-reading a comment.
+  const FETCH_SLOTS = location.search.indexOf("ytacfetchslots=1") !== -1;
+  const AD_KEY_RE = FETCH_SLOTS
+    ? /"(adPlacements|playerAds|adSlots)"/g
+    : /"(adPlacements|playerAds)"/g;
   // Only under ?ytacprune=1, and note adSlots is in this list where it is
   // deliberately absent from AD_KEY_RE above.
   const PRUNE_KEYS = ["adPlacements", "playerAds", "adSlots"];
-  let rewrites = { fetch: 0, xhr: 0 };
+  // reel is SEPARATE from fetch on purpose. The Shorts handler first written on
+  // 2026-08-29 incremented rewrites.fetch, so "fetch=3" would have meant three
+  // player responses, or three Shorts sequences, or any mix — one number under
+  // two labels, the identical fault this file's own 0.31.0 commit describes.
+  let rewrites = { fetch: 0, xhr: 0, reel: 0 };
 
   // Same flag as the cold-load path above, read once at the top of the file.
   // Two independent reads of the same switch is how they came to disagree.
@@ -503,7 +536,7 @@
     try {
       document.documentElement.setAttribute(
         "data-ytac-rewrote",
-        `fetch=${rewrites.fetch},xhr=${rewrites.xhr}`,
+        `fetch=${rewrites.fetch},xhr=${rewrites.xhr},reel=${rewrites.reel}`,
       );
     } catch {
       /* reporting only */
@@ -634,6 +667,40 @@
             () => noteMedia("failed"),
           );
         }
+        if (SHORTS_ON && REEL_URL.test(url)) {
+          return pending.then((res) => {
+            try {
+              if (!res || res.status !== 200) return res;
+              return res
+                .clone()
+                .text()
+                .then((body) => {
+                  if (!REEL_AD_RE.test(body)) return res;
+                  REEL_AD_RE.lastIndex = 0;
+                  const out = body.replace(REEL_AD_RE, '"isAd":false');
+                  rewrites.reel++;
+                  publishRewrites();
+                  // "isAd":true -> "isAd":false is one byte LONGER per hit, so
+                  // the inherited content-length now understates the body. The
+                  // player path ten lines below already deletes it for exactly
+                  // this reason; the first version of this handler copied the
+                  // headers wholesale and would have shipped a response whose
+                  // declared length was short.
+                  const headers = new Headers(res.headers);
+                  headers.delete("content-length");
+                  return new Response(out, {
+                    status: res.status,
+                    statusText: res.statusText,
+                    headers,
+                  });
+                })
+                .catch(() => res);
+            } catch {
+              return res;
+            }
+          });
+        }
+
         if (!PLAYER_URL.test(url)) return pending;
         pending
           .then((res) => (res && res.status === 200 ? res.clone().text() : null))
