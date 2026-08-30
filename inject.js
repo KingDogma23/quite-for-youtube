@@ -117,7 +117,6 @@
         q.indexOf("ytacnoinject=1") !== -1 ? "noinject" : "",
         q.indexOf("ytacprune=1") !== -1 ? "prune" : "",
         q.indexOf("ytacslots=") !== -1 ? "slots" : "",
-        q.indexOf("ytacfetchslots=1") !== -1 ? "fetchslots" : "",
         q.indexOf("ytacshorts=1") !== -1 ? "shorts" : "",
       ]
         .filter(Boolean)
@@ -515,22 +514,29 @@
   // uses. adPlacements and playerAds are still renamed, and those are what
   // actually carry the ads that get removed.
   //
-  // 2026-08-29, reading uBlock Origin's CURRENT rules rather than the technique:
-  // it renames adPlacements AND adSlots on this exact endpoint —
-  //   ||youtube.com/youtubei/v1/get_watch?$xhr,1p,replace=/"adSlots"/"no_ads"/
-  // and sets all three to undefined on the cold load. So the one key this file
-  // excludes is a key the maintained blocker includes.
+  // adSlots is not renamed here, and the reason is now measured rather than
+  // argued. On 2026-08-30, across 16+ loads, data-ytac-adsched-fetch read "P,A"
+  // every single time and never once "P,S,A": THE FETCH RESPONSE DOES NOT CARRY
+  // adSlots. Adding it to this regex matches a key that is never in the body.
+  // ?ytacfetchslots=1 existed to test exactly that, and is removed as a proven
+  // no-op.
   //
-  // Re-reading the measurement above: the slow arm is "rewrite ON and the
-  // response CARRIES adSlots" — that is renaming the other two and leaving
-  // adSlots pointing at ad payloads that no longer exist. It is not a
-  // measurement of renaming adSlots, which was never tried on this path.
-  // ?ytacfetchslots=1 tries it, so the question can be settled by playback
-  // timings instead of by re-reading a comment.
-  const FETCH_SLOTS = location.search.indexOf("ytacfetchslots=1") !== -1;
-  const AD_KEY_RE = FETCH_SLOTS
-    ? /"(adPlacements|playerAds|adSlots)"/g
-    : /"(adPlacements|playerAds)"/g;
+  // The decisive load was fLexgOxsZu0:
+  //
+  //   cold payload   P=1,S=4,A=1   adSlots present — and AD_KEYS has always
+  //                                neutralised all three
+  //   fetch response P,A           adSlots absent, nothing here to rename
+  //   advert         PLAYED
+  //
+  // So on a load where an advert appeared, every ad key this extension knows
+  // about had already been neutralised, and the advert arrived anyway. Renaming
+  // these fields does not prevent it — it reaches the player by another route,
+  // not through the JSON we edit. uBO renames adSlots on get_watch and would
+  // meet the same body we do.
+  //
+  // The response-rewrite hypothesis is closed. Anything further has to act on
+  // the media stream, not the player response.
+  const AD_KEY_RE = /"(adPlacements|playerAds)"/g;
   // Only under ?ytacprune=1, and note adSlots is in this list where it is
   // deliberately absent from AD_KEY_RE above.
   const PRUNE_KEYS = ["adPlacements", "playerAds", "adSlots"];
