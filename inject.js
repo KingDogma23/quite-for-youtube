@@ -477,14 +477,26 @@
   // returned untouched and unbuffered, which is the part the old blanket fetch
   // wrapper got wrong.
   const PLAYER_URL = /\/youtubei\/v1\/(player|get_watch)(\?|$)/;
-  // Shorts. uBO carries a dedicated rule for this endpoint and this file carried
-  // nothing, so Shorts adverts were never touched at all. A 50-Shorts run on
-  // 2026-08-29 saw zero adverts, which was read as "Shorts are clean" — with no
-  // positive control, that reading was worth nothing.
+  // Shorts. MEASURED INERT — read this before believing it does anything.
   //
-  // uBO prunes reelWatchSequenceResponse...adClientParams.isAd. Flipping the
-  // flag to false is the rename-shaped equivalent: the key stays, so nothing
-  // downstream sees a missing property. Behind ?ytacshorts=1 until measured.
+  // Written on 2026-08-29 by copying uBO's rule for reelWatchSequenceResponse
+  // ...adClientParams.isAd, on the premise that this file touched nothing on
+  // Shorts. Run for the first time on 2026-08-30, and the premise was wrong
+  // twice over:
+  //
+  //   1. /reel_watch_sequence is NEVER CALLED. Not on a direct Shorts load, and
+  //      not on advancing to the next Short — advancing is a full navigation
+  //      here. Across both, the only youtubei endpoints seen were player and
+  //      log_event. This handler cannot fire in that configuration.
+  //   2. A Shorts page calls /youtubei/v1/player, which PLAYER_URL already
+  //      matches, so Shorts player responses were being rewritten all along.
+  //      The "gap" this was written to close was largely not a gap.
+  //
+  // Kept, switch-gated, because a configuration that does call the endpoint may
+  // exist (the Shorts shelf inside the home feed, or mobile) and the code is
+  // harmless when it never runs. reelSeen counts responses that reached it, so
+  // "never fired" is distinguishable from "fired and found nothing" — the
+  // distinction this handler could not make on the day it was written.
   const REEL_URL = /\/reel_watch_sequence/;
   const SHORTS_ON = location.search.indexOf("ytacshorts=1") !== -1;
   const REEL_AD_RE = /"isAd"\s*:\s*true/g;
@@ -526,7 +538,7 @@
   // 2026-08-29 incremented rewrites.fetch, so "fetch=3" would have meant three
   // player responses, or three Shorts sequences, or any mix — one number under
   // two labels, the identical fault this file's own 0.31.0 commit describes.
-  let rewrites = { fetch: 0, xhr: 0, reel: 0 };
+  let rewrites = { fetch: 0, xhr: 0, reel: 0, reelSeen: 0 };
 
   // Same flag as the cold-load path above, read once at the top of the file.
   // Two independent reads of the same switch is how they came to disagree.
@@ -536,7 +548,7 @@
     try {
       document.documentElement.setAttribute(
         "data-ytac-rewrote",
-        `fetch=${rewrites.fetch},xhr=${rewrites.xhr},reel=${rewrites.reel}`,
+        `fetch=${rewrites.fetch},xhr=${rewrites.xhr},reel=${rewrites.reel}/${rewrites.reelSeen}`,
       );
     } catch {
       /* reporting only */
@@ -671,6 +683,8 @@
           return pending.then((res) => {
             try {
               if (!res || res.status !== 200) return res;
+              rewrites.reelSeen++;
+              publishRewrites();
               return res
                 .clone()
                 .text()
