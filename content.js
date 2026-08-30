@@ -754,8 +754,33 @@
   // during init rather than merely reading as undefined.
   let vid = { id: null, rewrote: false, adSeen: false };
 
+  // One advert, one credit.
+  //
+  // handleVideoAd() runs on every tick while an advert is on screen, and both
+  // its branches called recordAd(). A skip button that stays visible for two
+  // ticks, or a seek that needs a second attempt, therefore counted the SAME
+  // advert again — and again. Measured 2026-08-30 on the test profile: about
+  // 400 automated loads produced "6,354 ads skipped" and "245h 48m saved",
+  // against a measured advert rate of roughly 6%. The figure was impossible.
+  //
+  // vid.adSeen existed and was set here, but nothing ever read it to stop the
+  // double count; it feeds the protected/leaked verdict only. adCredited is
+  // reset when the advert clears (see tick), so a genuine mid-roll later in the
+  // same video is still counted once.
+  let adCredited = false;
+  // When the advert state last went quiet. adIsPlaying() flickers while a skip
+  // or a seek lands — the overlay disappears for a tick and comes back — so a
+  // flag reset the instant it reads false credits the SAME advert several
+  // times. Measured 2026-08-30 over 35 loads: 9 adverts produced 28 credits
+  // with a bare flag, against 148 with no guard at all. An advert only counts
+  // as finished once it has been absent for this long.
+  let adGoneSince = 0;
+  const AD_GAP_MS = 3000;
+
   function recordAd(seconds) {
     vid.adSeen = true;
+    if (adCredited) return;
+    adCredited = true;
     lifetime.adsSkipped = (lifetime.adsSkipped || 0) + 1;
     if (Number.isFinite(seconds) && seconds > 0 && seconds < 600) {
       lifetime.secondsSaved += seconds;
@@ -982,7 +1007,16 @@
   }
 
   function handleVideoAd() {
-    if (!settings.skipVideoAds || !adIsPlaying()) return;
+    if (!settings.skipVideoAds || !adIsPlaying()) {
+      // Only treat the advert as finished after a sustained gap, so the flicker
+      // around a skip or seek does not re-open crediting mid-advert. A genuine
+      // second advert — a pod, or a mid-roll later on — is still counted, since
+      // the gap between them exceeds this.
+      if (!adGoneSince) adGoneSince = Date.now();
+      else if (Date.now() - adGoneSince > AD_GAP_MS) adCredited = false;
+      return;
+    }
+    adGoneSince = 0;
 
     const p = player();
 
