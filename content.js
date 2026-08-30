@@ -789,7 +789,19 @@
   }
 
   /**
-   * Videos whose ad schedule was stopped at source, before the player saw it.
+   * Videos whose ad keys were neutralised in the player response.
+   *
+   * This used to say "stopped at source, before the player saw it", which the
+   * measurements of 2026-08-30 disproved. Neutralising the keys does NOT stop
+   * the advert: on load fLexgOxsZu0 every key this extension knows about had
+   * been neutralised and the advert played anyway, and across 200 controlled
+   * loads the rewrite made no difference to whether one appeared (1/20 escaped
+   * with it against 1/35 without, p = 0.60). What the advert costs is the SABR
+   * backoff, and that is a separate mechanism behind ?ytacsabr=.
+   *
+   * So this counts responses this extension rewrote — real work, honestly
+   * counted — and not adverts prevented. Nothing user-facing should describe it
+   * as the latter.
    *
    * inject.js runs in the page and cannot reach chrome.storage, but it already
    * publishes a monotonic count of neutralised player responses on
