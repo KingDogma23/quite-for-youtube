@@ -1,6 +1,10 @@
 <svg viewBox="0 0 48 48" role="img" aria-label="Quite for YouTube icon">
-  <rect width="48" height="48" rx="10.56" fill="#14201b"/>
-  <g fill="none" stroke="#35b98c" stroke-width="5.52">
+  <!-- Inverted 2026-08-30: the colour is the silhouette, not a detail inside a
+       near-black square. All three products shared the same dark ground, so at
+       16px in the toolbar they were indistinguishable and only the 128px view
+       showed the hue. -->
+  <rect width="48" height="48" rx="10.56" fill="#35b98c"/>
+  <g fill="none" stroke="#14201b" stroke-width="5.52">
     <circle cx="24" cy="24" r="8.68"/>
     <path d="M26.04 26.04 L33.61 33.61"/>
   </g>
