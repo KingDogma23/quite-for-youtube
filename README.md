@@ -32,8 +32,11 @@ it can currently see in the player, with a **Copy report** button.
 ## Privacy
 
 - Runs **only** on `youtube.com`. No permission to access any other site.
-- Sends nothing anywhere. No server, no analytics, no account, no tracking.
-- The only thing stored is your checkbox settings.
+- No server, no analytics, no account, no tracking. Nothing is sent to us.
+- Stored: your checkbox settings, and a count of what has been skipped or
+  hidden. Settings use Chrome's own extension-settings sync, so with Chrome
+  sync switched on they travel with your Chrome profile, as any extension's
+  settings do. The per-hop diagnostic log is off unless you turn it on.
 - Never modifies your YouTube account, watch history or preferences.
 
 ## Development

@@ -31,8 +31,10 @@ Every option can be switched off individually, and the whole extension has a
 single on/off switch.
 
 It runs only on youtube.com. It has no account, no server and no analytics,
-and it never sends anything anywhere. The only thing it stores is which of the
-checkboxes you have ticked.
+and nothing is sent to us. It stores the checkboxes you have ticked and a
+running count of what it has skipped or hidden. Settings use Chrome's own
+extension-settings sync, so with Chrome sync switched on they travel with
+your Chrome profile, as any extension's settings do.
 
 YouTube changes its player regularly. When that happens some skipping can stop
 working until the extension is updated — the extension is built to fail
