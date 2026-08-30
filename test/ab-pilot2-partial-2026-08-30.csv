@@ -1,0 +1,57 @@
+i,arm,id,cls,S,dur,ct,navDeficit,extDeficit,adSeen,adVisibleMs,settledAt,switches,version,vis,focus,cold
+0,on,8c5oYjKqAkM,ok,1,187,2.61,17.68,15.68,1,507,20290,none,0.31.13,visible,false,P=1 S=2 A=1
+1,off,n6z7YSRI30I,ok,0,192,2.68,17.12,15.8,1,507,19798,off,0.31.13,visible,false,
+2,on,AyouckHkUV0,ok,1,127,2.94,16.89,15.2,1,14562,19825,none,0.31.13,visible,false,P=1 S=8 A=1
+3,off,Dedg7lkbuAs,ok,0,526,2.73,22.13,20.83,1,509,24861,off,0.31.13,visible,false,
+4,on,UsIr9f5gURM,ok,1,924,2.56,21.82,19.86,1,10676,24378,none,0.31.13,visible,false,P=3 S=5 A=1
+5,off,4I5v4tlMtZM,ok,0,167,2.74,17.02,15.61,1,15116,19760,off,0.31.13,visible,false,
+6,on,AenRNoY3D4Q,ok,1,134,2.82,10.43,8.94,1,1016,13249,none,0.31.13,visible,false,P=1 S=5 A=1
+7,off,AuLa8iATjus,ok,0,184,2.99,17.34,15.94,1,0,20325,off,0.31.13,visible,false,
+8,on,VJ9kJcDbXTQ,ok,1,211,2.7,13.64,11.89,1,0,16343,none,0.31.13,visible,false,P=1 S=3 A=1
+9,off,J1kpYzJrCo0,ok,0,194,2.85,17.58,16.24,1,507,20431,off,0.31.13,visible,false,
+10,on,RRYHUtSIADY,ok,1,197,2.58,17.83,15.94,1,543,20407,none,0.31.13,visible,false,P=1 S=2 A=1
+11,off,HA8V2vSo-FA,ok,0,498,2.59,14.3,12.87,1,8043,16893,off,0.31.13,visible,false,
+12,on,CmaqxSWY1v0,ok,1,109,2.9,9.31,7.89,1,7036,12207,none,0.31.13,visible,false,P=1 S=4 A=1
+13,off,ccN8sYdsW_8,ok,0,188,2.97,18.12,16.17,1,1177,21087,off,0.31.13,visible,false,
+14,on,TyXf3RNBgrM,ok,1,195,2.93,17.36,15.93,1,0,20286,none,0.31.13,visible,false,P=1 S=2 A=1
+15,off,squMiSk0DVk,ok,0,195,2.9,14.12,12.17,1,696,17015,off,0.31.13,visible,false,
+16,on,l8t2qNcOtfs,ok,1,196,3.08,17.74,15.78,1,509,20816,none,0.31.13,visible,false,P=1 S=2 A=1
+17,off,8ahF08NeyhY,ok,0,197,2.59,17.66,16.01,1,504,20247,off,0.31.13,visible,false,
+18,on,lwg_AObKIXA,ok,1,193,2.69,17.59,16.02,1,0,20276,none,0.31.13,visible,false,P=1 S=2 A=1
+19,off,KMVX9AXpuM0,ok,0,139,2.97,17.32,15.73,1,15115,20291,off,0.31.13,visible,false,
+20,on,knzpiTFfcQw,ok,1,130,2.96,11.31,9.75,1,1005,14269,none,0.31.13,visible,false,P=1 S=5 A=1
+21,off,uwx9nMb_GMA,ok,0,133,3.05,1.16,-0.17,0,,4205,off,0.31.13,visible,false,
+22,on,lxICpUSsPHA,ok,1,130,2.84,10.94,9.59,1,507,13779,none,0.31.13,visible,false,P=1 S=3 A=1
+23,off,LuVCELWM0BM,ok,0,138,2.97,14.26,12.63,1,8051,17233,off,0.31.13,visible,false,
+24,on,xvPpP5W3gVQ,ok,1,185,2.69,17.6,15.91,1,540,20286,none,0.31.13,visible,false,P=1 S=2 A=1
+25,off,WcAkM46PZU4,ok,0,125,2.76,17.71,15.9,1,504,20470,off,0.31.13,visible,false,
+26,on,N1otYsLAplQ,ok,1,371,2.97,11.25,9.77,1,1001,14223,none,0.31.13,visible,false,P=1 S=5 A=1
+27,off,owOEb9vXbOU,ok,0,180,2.88,10.31,8.67,1,1519,13190,off,0.31.13,visible,false,
+28,on,2GJPGLJY5Ac,ok,1,185,3.02,17.27,15.83,1,0,20295,none,0.31.13,visible,false,P=1 S=2 A=1
+29,off,Z2rDFcknTHw,ok,0,180,2.87,17.38,15.85,1,501,20250,off,0.31.13,visible,false,
+30,on,c2dAici-FSE,ok,1,202,2.6,10.26,8.95,1,1003,12857,none,0.31.13,visible,false,P=1 S=6 A=1
+31,off,af-jTYn5tig,ok,0,174,2.88,17.58,15.26,1,500,20459,off,0.31.13,visible,false,
+32,on,LyxJWtoyK0o,ok,1,675,2.73,11.28,9.7,1,2214,14012,none,0.31.13,visible,false,P=4 S=6 A=1
+33,off,rng_yUSwrgU,ok,0,680,2.92,11.43,9.63,1,1010,14345,off,0.31.13,visible,false,
+34,on,q0aFOxT6TNw,ok,1,741,2.97,10.57,8.69,1,8304,13536,none,0.31.13,visible,false,P=2 S=7 A=1
+35,off,tDARtYjUiHs,ok,0,981,3.05,29.5,28.07,1,1018,32548,off,0.31.13,visible,false,
+36,on,YSwjHlsTI10,ok,1,896,2.79,22.77,21.13,1,590,25565,none,0.31.13,visible,false,P=5 S=5 A=1
+37,off,wCEMOBUTL98,ok,0,213,2.76,11.2,9.83,1,1010,13955,off,0.31.13,visible,false,
+38,on,IJWvYvCJ0os,ok,1,627,2.78,10.47,8.86,1,1014,13251,none,0.31.13,visible,false,P=1 S=3 A=1
+39,off,hX_mWJAleVQ,ok,0,245,2.79,10.56,8.84,1,1014,13347,off,0.31.13,visible,false,
+40,on,xRla0izRxqU,ok,1,693,2.75,18.61,16.92,1,1017,21365,none,0.31.13,visible,false,P=2 S=5 A=1
+41,off,fN6q3RdTbsY,ok,0,299,2.89,13.4,11.99,1,0,16289,off,0.31.13,visible,false,
+42,on,ZUydETmYCgw,ok,1,766,2.79,5.47,3.99,1,2071,8260,none,0.31.13,visible,false,P=6 S=6 A=1
+43,off,-vNYY2XQsCc,ok,0,793,2.68,11.65,9.96,1,1032,14333,off,0.31.13,visible,false,
+44,on,-sq0-M88-HY,ok,1,208,2.98,14.37,12.87,1,8102,17350,none,0.31.13,visible,false,P=1 S=6 A=1
+45,off,oVqh87TfspA,ok,0,220,3.07,17.28,15.51,1,15125,20350,off,0.31.13,visible,false,
+46,on,sRruWhlzVEI,nosettle,1,198,90.62,,,1,89925,,none,0.31.13,visible,false,P=4 S=8 A=1
+47,off,BU9gKr1miS8,ok,0,983,2.89,5.96,4.13,1,1535,8851,off,0.31.13,visible,false,
+48,on,IkIh-_cg6iA,ok,1,605,2.8,18.84,16.98,1,1006,21642,none,0.31.13,visible,false,P=4 S=5 A=1
+49,off,5EeWu1CS2Ac,ok,0,1340,2.97,16.88,15.25,1,14620,19854,off,0.31.13,visible,false,
+50,on,y5QO4Pk1Tmw,ok,1,625,2.91,16.92,15.18,1,14567,19828,none,0.31.13,visible,false,P=4 S=8 A=1
+51,off,UDhEUshq2Ug,ok,0,5755,2.82,18.54,16.98,1,1519,21363,off,0.31.13,visible,false,
+52,on,Opsi8BOD-bY,ok,1,687,2.83,14.41,12.78,1,8031,17237,none,0.31.13,visible,false,P=3 S=6 A=1
+53,off,s1XVb4mdELc,ok,0,861,2.85,11.18,9.58,1,8754,14030,off,0.31.13,visible,false,
+54,on,9udsOx_qhi0,ok,1,563,2.6,29.38,28.07,1,516,31979,none,0.31.13,visible,false,P=4 S=5 A=1
+55,off,C_tgbgrhJWM,ok,0,711,2.69,18.8,16.99,1,1001,21493,off,0.31.13,visible,false,

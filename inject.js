@@ -102,6 +102,48 @@
   // "inject.js entirely off" while claiming to measure "rewrite off".
   const NO_REWRITE = location.search.indexOf("ytacnorewrite=1") !== -1;
 
+  // ?ytacsabr= — the SABR backoff. Read ONCE, like NO_REWRITE above; two reads
+  // of one switch is how they came to disagree.
+  //
+  // WHY THIS EXISTS. YouTube's SABR streaming protocol carries a backoffTimeMs
+  // field telling the player how long to wait before requesting video data.
+  // That wait EXISTS TO COVER THE AD SLOT. With no blocker the advert fills it
+  // and nobody notices. With a blocker the advert is gone and the wait remains,
+  // so the viewer trades an advert for a spinner of the same length and
+  // correctly reports that blocking did nothing.
+  //
+  // First mechanism that accounts for every symptom on file at once:
+  //   - "two ads speeded up and spinning wheel"
+  //   - 2026-08-27 bisect: extension live, 3 of 7 hops over 3s, worst 10.4s;
+  //     bypassed, 12 of 12 hops at 173-432ms
+  //   - 2026-08-30 A/B pilot: on ad-carrying loads the extension arm was SLOWER
+  //     (13.56s) than the bypassed arm (11.30s). We removed the advert and cost
+  //     the viewer more time than leaving it alone.
+  //   - the stall recovery that shipped in eleven versions and was never once
+  //     observed rescuing a load: aimed at this stall, with the wrong fix.
+  //
+  // Source: brave-yt-sabr-fix.js in brave/adblock-resources, itself crediting
+  // https://iter.ca/post/yt-adblock/. Brave does NOT ship it: the filter line is
+  // commented out in brave-specific.txt and the header tells users to paste it
+  // in by hand.
+  //
+  //   ?ytacsabr=observe  scan and REPORT, change nothing. The positive control:
+  //                      if ad-carrying loads show no backoff over 500ms then
+  //                      this idea is wrong, and no behaviour was altered to
+  //                      find that out.
+  //   ?ytacsabr=1        rewrite backoffTimeMs
+  //   ?ytacsabr=2        rewrite + force a fresh ad-free SABR session. Riskier:
+  //                      cancelPlayback/loadVideoById can break playback.
+  //
+  // None of these is a default and none becomes one without a measurement.
+  const SABR_MODE = (() => {
+    const m = /[?&]ytacsabr=([a-z0-9]+)/i.exec(location.search);
+    return m ? m[1].toLowerCase() : "";
+  })();
+  const SABR_ON = /^(observe|1|2)$/.test(SABR_MODE);
+  const SABR_PATCH = SABR_MODE === "1" || SABR_MODE === "2";
+  const SABR_FRESH = SABR_MODE === "2";
+
   // Published FIRST, before any switch can return early. This used to live in
   // publish(), which the bypass below skips — so the report of which switch was
   // in force disappeared exactly when a switch was in force, and that same A/B
@@ -118,6 +160,7 @@
         q.indexOf("ytacprune=1") !== -1 ? "prune" : "",
         q.indexOf("ytacslots=") !== -1 ? "slots" : "",
         q.indexOf("ytacshorts=1") !== -1 ? "shorts" : "",
+        SABR_ON ? "sabr:" + SABR_MODE : "",
       ]
         .filter(Boolean)
         .join(",") || "none",
@@ -509,7 +552,7 @@
   //   rewrite OFF, response carries adSlots   fast, 528ms, gap 272ms
   //   neither arm, no adSlots in response     fast in both
   //
-  // That is the delay Martin reported for days: a four-second wait on exactly
+  // That is the delay reported from live use for days: a four-second wait on exactly
   // the videos where YouTube fills ad slots, on exactly the navigation path he
   // uses. adPlacements and playerAds are still renamed, and those are what
   // actually carry the ads that get removed.
@@ -656,6 +699,211 @@
       );
     } catch {
       /* reporting only */
+    }
+  }
+
+  const sabr = { req: 0, small: 0, found: 0, patched: 0, fresh: 0, max: 0 };
+
+  // Counts its own successes. A feature that cannot report having done
+  // something useful does not get to stay. `max` is the decisive number: the
+  // largest backoff actually observed. If ad-carrying loads never show one over
+  // 500ms this whole idea is wrong, and the counter says so out loud.
+  //
+  // `found` is the over-firing guard. 0x20 also occurs as ordinary data, so if
+  // `found` runs far above one per request the value band below is too loose
+  // and this comes straight back out.
+  function publishSabr() {
+    try {
+      document.documentElement.setAttribute(
+        "data-ytac-sabr",
+        `mode=${SABR_MODE || "off"},req=${sabr.req},small=${sabr.small},` +
+          `found=${sabr.found},max=${sabr.max},patched=${sabr.patched},fresh=${sabr.fresh}`,
+      );
+    } catch {
+      /* reporting only */
+    }
+  }
+
+  // Read a stream, abandoning it once `cap` bytes accumulate. null means "media
+  // chunk, not a control message" — those stream to the player untouched.
+  function sabrReadAll(reader, cap) {
+    const chunks = [];
+    let total = 0;
+    return reader.read().then(function pump(r) {
+      if (r.done) {
+        const out = new Uint8Array(total);
+        for (let i = 0, off = 0; i < chunks.length; off += chunks[i].length, i++) {
+          out.set(chunks[i], off);
+        }
+        return out;
+      }
+      chunks.push(r.value);
+      total += r.value.length;
+      if (total >= cap) {
+        try {
+          reader.cancel();
+        } catch {
+          /* already gone */
+        }
+        return null;
+      }
+      return reader.read().then(pump);
+    });
+  }
+
+  /**
+   * Find protobuf field 4, wire type 0 (varint) — backoffTimeMs. Tag byte is
+   * (4 << 3 | 0) = 0x20.
+   *
+   * Rewrites IN PLACE at the SAME byte width, so the message length and every
+   * offset after it stay valid. A naive single-byte write leaves an orphaned
+   * continuation byte and corrupts every field that follows; the test for this
+   * function passed 41 assertions against exactly that bug before being rewritten
+   * to walk the whole message as protobuf. It now reports "bad wire type" and
+   * "field 0 is invalid" on the mutant, which is what a real test looks like.
+   */
+  function sabrScan(bytes) {
+    let hits = 0;
+    for (let i = 0; i < bytes.length - 2; i++) {
+      if (bytes[i] !== 0x20) continue;
+      let val = 0;
+      let shift = 0;
+      let end = i + 1;
+      while (end < bytes.length && shift < 35) {
+        val |= (bytes[end] & 0x7f) << shift;
+        if (!(bytes[end] & 0x80)) {
+          end++;
+          break;
+        }
+        shift += 7;
+        end++;
+      }
+      if (val <= 500 || val >= 100000) continue;
+      hits++;
+      if (val > sabr.max) sabr.max = val;
+      if (!SABR_PATCH) continue;
+      // 50-150ms rather than 0: a clean zero is a fingerprint, ordinary backoff
+      // noise is not. Same reasoning that made renaming keys safe where crude
+      // deletion was not.
+      let remaining = 50 + Math.floor(Math.random() * 100);
+      let pos = i + 1;
+      while (pos < end - 1) {
+        bytes[pos++] = (remaining & 0x7f) | 0x80;
+        remaining >>>= 7;
+      }
+      bytes[pos] = remaining & 0x7f;
+      sabr.patched++;
+    }
+    return hits;
+  }
+
+  // ?ytacsabr=2 only. Guarded once per video id so a session that still backs
+  // off falls back to patching instead of looping, and skipped once playback is
+  // under way — a backoff mid-video is ordinary pacing, not an ad slot.
+  let sabrReloaded = null;
+  function sabrForceFresh() {
+    try {
+      const vid = new URL(location.href).searchParams.get("v");
+      if (!vid || vid === sabrReloaded) return;
+      const v = document.querySelector("video");
+      if (v && v.currentTime > 1) return;
+      const pl = document.getElementById("movie_player");
+      if (!pl || !pl.cancelPlayback || !pl.loadVideoById) return;
+      sabrReloaded = vid;
+      const vd = pl.getVideoData && pl.getVideoData();
+      if (vd) vd.isInlinePlaybackNoAd = true;
+      pl.cancelPlayback();
+      const realLoad = pl.loadVideoById.bind(pl);
+      pl.loadVideoById = () => {};
+      setTimeout(() => {
+        pl.loadVideoById = realLoad;
+        pl.loadVideoById(vid);
+      }, 1000);
+      sabr.fresh++;
+      publishSabr();
+    } catch {
+      /* a failed reload must never take the player with it */
+    }
+  }
+
+  if (SABR_ON) {
+    try {
+      const sabrNativeFetch = window.fetch;
+      window.fetch = function (input, init) {
+        const url =
+          typeof input === "string"
+            ? input
+            : (input && (input.url || String(input))) || "";
+        // SABR media only. Every other request passes through untouched.
+        if (url.indexOf("googlevideo.com") === -1 || url.indexOf("sabr=1") === -1) {
+          return sabrNativeFetch.apply(this, arguments);
+        }
+        sabr.req++;
+        return sabrNativeFetch.apply(this, arguments).then((res) => {
+          try {
+            if (!res || !res.ok || !res.body) return res;
+            let pass;
+            let scan;
+            let reinit;
+            try {
+              [pass, scan] = res.body.tee();
+              reinit = {
+                status: res.status,
+                statusText: res.statusText,
+                headers: res.headers,
+              };
+            } catch {
+              // Locked or unteeable: hand the original back. A missing media
+              // stream is a dead video, far worse than a spinner.
+              return res;
+            }
+
+            if (!SABR_PATCH) {
+              // OBSERVE. Return the untouched stream immediately and scan the
+              // copy in parallel so nothing waits on us. That is what makes it
+              // a control rather than a third variant with its own timing.
+              sabrReadAll(scan.getReader(), 1000)
+                .then((bytes) => {
+                  if (bytes === null) return;
+                  sabr.small++;
+                  sabr.found += sabrScan(bytes);
+                  publishSabr();
+                })
+                .catch(() => {
+                  /* observation only */
+                });
+              return new Response(pass, reinit);
+            }
+
+            // PATCH. Must buffer the control message, rewrite, and re-emit.
+            return sabrReadAll(scan.getReader(), 1000)
+              .then((bytes) => {
+                if (bytes === null) return new Response(pass, reinit);
+                sabr.small++;
+                const hits = sabrScan(bytes);
+                if (hits) {
+                  sabr.found += hits;
+                  if (SABR_FRESH) sabrForceFresh();
+                }
+                publishSabr();
+                const out = new Response(bytes, reinit);
+                try {
+                  Object.defineProperty(out, "url", { value: res.url, configurable: true });
+                  Object.defineProperty(out, "type", { value: res.type, configurable: true });
+                } catch {
+                  /* cosmetic only */
+                }
+                return out;
+              })
+              .catch(() => res);
+          } catch {
+            return res;
+          }
+        });
+      };
+      publishSabr();
+    } catch {
+      /* a failed install must leave window.fetch alone */
     }
   }
 

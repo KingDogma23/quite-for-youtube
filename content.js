@@ -784,7 +784,7 @@
    * Neutralisations across EVERY path. Reading data-ytac-rewrites alone was why
    * this credited nothing: that attribute counts cold loads, and a CLICKED video
    * is rewritten on the fetch path, which publishes to data-ytac-rewrote. The
-   * counter was blind to the only path Martin actually uses. Measured 2026-08-29
+   * counter was blind to the only path real use takes. Measured 2026-08-29
    * on 0.31.1: fetch=3 neutralised, 0 videos credited.
    */
   function totalRewrites() {

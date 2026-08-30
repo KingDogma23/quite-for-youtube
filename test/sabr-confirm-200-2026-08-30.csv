@@ -1,0 +1,200 @@
+i,arm,id,cls,S,adSeen,dur,ct,navDeficit,sabrReq,sabrFound,sabrMax,sabrPatched,sabrFresh,idMatch,playerErr,paused,switches,version,cold
+0,observe,QSdaGS9bWdI,ok,1,1,720,2.85,14.47,2,1,12800,0,0,1,,0,sabr:observe,0.31.14,P=5 S=6 A=1
+1,fresh,Alcrxzoo2kk,ok,1,1,9320,2.76,7.46,10,7,4000,7,1,1,,0,sabr:2,0.31.14,P=56 S=6 A=1
+2,observe,YlQsvzORvUY,nosettle,1,1,199,67.32,,23,10,14262,0,0,1,,0,sabr:observe,0.31.14,P=14 S=8 A=1
+3,fresh,LmvtOwuO8ZA,ok,1,1,284,2.8,7.92,10,7,12800,7,1,1,,0,sabr:2,0.31.14,P=1 S=7 A=1
+4,observe,TllxhhJi1Lc,nosettle,1,1,302,67.12,,22,8,8000,0,0,1,,0,sabr:observe,0.31.14,P=13 S=8 A=1
+5,fresh,_NjDxBsMk5M,ok,1,1,1894,2.87,31.24,35,32,28000,32,1,1,,0,sabr:2,0.31.14,P=13 S=6 A=1
+6,observe,FcJVA4tE_cA,ok,1,1,1710,2.94,10.94,2,1,8800,0,0,1,,0,sabr:observe,0.31.14,P=13 S=5 A=1
+7,fresh,QkqoRmo5y90,ok,1,1,1114,2.76,12.61,18,12,9600,12,1,1,,0,sabr:2,0.31.14,P=7 S=5 A=1
+8,observe,HlFQK3kR7tc,ok,1,1,429,2.75,13.47,2,1,12000,0,0,1,,0,sabr:observe,0.31.14,P=1 S=3 A=1
+9,fresh,1jfzM7SEW_4,ok,1,1,2166,2.65,23.92,31,26,28000,26,1,1,,0,sabr:2,0.31.14,P=12 S=5 A=1
+10,observe,BVOQ2JTiktY,ok,1,1,1122,2.81,5.51,2,2,4900,0,0,1,,0,sabr:observe,0.31.14,P=5 S=6 A=1
+11,fresh,m3CqH4DjVlI,ok,1,0,799,3.05,2.72,5,3,9600,3,1,1,,0,sabr:2,0.31.14,P=6 S=5 A=1
+12,observe,0RUeOfZ1bnM,ok,1,1,488,3.04,21.51,4,2,20000,0,0,1,,0,sabr:observe,0.31.14,P=4 S=7 A=1
+13,fresh,s_MWKMB30lE,ok,1,1,1368,2.57,12.45,17,12,9600,12,1,1,,0,sabr:2,0.31.14,P=9 S=5 A=1
+14,observe,0tiK1yE-Vy0,ok,1,1,2087,3.05,12.98,6,3,4000,0,0,1,,0,sabr:observe,0.31.14,P=12 S=6 A=1
+15,fresh,EahjjTgg4tg,ok,1,0,146,2.59,2.77,3,2,12800,2,1,1,,0,sabr:2,0.31.14,P=1 S=7 A=1
+16,observe,cagYqNJrFnA,ok,1,1,1532,2.75,22.88,2,1,20800,0,0,1,,0,sabr:observe,0.31.14,P=10 S=5 A=1
+17,fresh,Rf0PUA9zENw,ok,1,0,634,2.93,3.41,5,4,10758,4,1,1,,0,sabr:2,0.31.14,P=4 S=5 A=1
+18,observe,cODwTSqHmIE,nosettle,1,1,302,67.78,,26,12,15512,0,0,1,,0,sabr:observe,0.31.14,P=1 S=8 A=1
+19,fresh,9Yz0MyzDqvU,ok,1,1,131,2.94,13,16,12,9600,12,1,1,,0,sabr:2,0.31.14,P=1 S=8 A=1
+20,observe,-9Osn7JsP1Y,ok,1,1,482,2.78,21.6,6,3,20000,0,0,1,,0,sabr:observe,0.31.14,P=2 S=7 A=1
+21,fresh,ZHm1aKxAsIs,ok,1,0,496,2.93,2.75,5,3,9600,3,1,1,,0,sabr:2,0.31.14,P=2 S=6 A=1
+22,observe,wcFDYfMxTf0,nosettle,1,1,302,75.98,,24,8,22071,0,0,1,,0,sabr:observe,0.31.14,P=1 S=8 A=1
+23,fresh,SnSXT0Pzldw,ok,1,0,415,2.71,2.97,5,3,4000,3,1,1,,0,sabr:2,0.31.14,P=1 S=8 A=1
+24,observe,YYVTRixFpj8,nosettle,1,1,302,75.5,,23,7,8000,0,0,1,,0,sabr:observe,0.31.14,P=1 S=8 A=1
+25,fresh,0OeCjbXlPoA,ok,1,0,689,2.92,2.85,5,3,4000,3,1,1,,0,sabr:2,0.31.14,P=4 S=8 A=1
+26,observe,CTuGXdyrWUo,nosettle,1,1,302,75.85,,28,11,55921,0,0,1,,0,sabr:observe,0.31.14,P=3 S=8 A=1
+27,fresh,o9R79a4s-BI,ok,1,1,3555,2.96,12.01,15,11,8800,11,1,1,,0,sabr:2,0.31.14,P=15 S=8 A=1
+28,observe,-Hfd3iD0LRk,nosettle,1,1,336,75.74,,21,10,11778,0,0,1,,0,sabr:observe,0.31.14,P=1 S=8 A=1
+29,fresh,sTAiDki7AQA,ok,1,1,538,2.88,7.01,10,7,28000,7,1,1,,0,sabr:2,0.31.14,P=3 S=5 A=1
+30,observe,aM628AA9EMk,ok,0,0,944,4.01,2.06,2,1,2000,0,0,1,,0,sabr:observe,0.31.14,none
+31,fresh,j5MNUfQu7L8,ok,1,1,175,3.05,25.17,21,16,12800,16,1,1,,0,sabr:2,0.31.14,P=1 S=8 A=1
+32,observe,Viw7rOLShF4,ok,1,1,366,2.97,17.32,7,6,70732,0,0,1,,0,sabr:observe,0.31.14,P=1 S=8 A=1
+33,fresh,4OgoLpMJmn8,ok,1,0,465,2.86,2.83,3,2,8000,2,1,1,,0,sabr:2,0.31.14,P=1 S=8 A=1
+34,observe,xSUz82dbw8k,nosettle,1,1,302,75.47,,22,9,8000,0,0,1,,0,sabr:observe,0.31.14,P=1 S=8 A=1
+35,fresh,2FVfJTGpXnU,ok,0,0,969,7.85,1.36,2,1,2000,1,0,1,,0,sabr:2,0.31.14,P=5 A=1
+36,observe,_P1B7PxAwk0,ok,1,1,687,3.01,26.59,6,2,20800,0,0,1,,0,sabr:observe,0.31.14,P=7 S=5 A=1
+37,fresh,XShWCGeMb50,ok,1,1,1926,2.63,38.41,24,20,16800,20,1,1,,0,sabr:2,0.31.14,P=5 S=8 A=1
+38,observe,2YquYkNcF7I,ok,1,1,1069,3.06,6.43,2,1,4000,0,0,1,,0,sabr:observe,0.31.14,P=3 S=6 A=1
+39,fresh,lbrYvBRs-r4,ok,1,1,12103,2.99,14.35,10,7,8800,7,1,1,,0,sabr:2,0.31.14,P=68 S=5 A=1
+40,observe,o_Zs8UdCArM,ok,1,1,3373,2.93,7.2,5,3,4000,0,0,1,,0,sabr:observe,0.31.14,P=33 S=6 A=1
+41,fresh,nwyqp8KFGiI,ok,1,1,831,2.95,27.92,25,20,16800,20,1,1,,0,sabr:2,0.31.14,P=4 S=5 A=1
+42,observe,ouhiLIwp6ug,ok,1,1,2531,2.88,6.44,6,3,4000,0,0,1,,0,sabr:observe,0.31.14,P=16 S=6 A=1
+44,observe,0H1lyT4BI-A,ok,0,0,1372,2.63,1.53,2,1,2000,0,0,1,,0,sabr:observe,0.31.14,P=7 A=1
+45,fresh,EF8C4v7JIbA,ok,1,1,4042,2.66,12.06,15,11,8800,11,1,1,,0,sabr:2,0.31.14,P=24 S=5 A=1
+46,observe,qqgwuL07JtI,ok,0,0,279,3.03,1.59,0,0,0,0,0,1,,0,sabr:observe,0.31.14,none
+47,fresh,Ceww6yLijFc,ok,1,0,3007,3.05,3.11,3,2,20800,2,1,1,,0,sabr:2,0.31.14,P=20 S=6 A=1
+48,observe,llAMvkrVAMY,ok,1,1,447,2.59,16.57,6,3,4000,0,0,1,,0,sabr:observe,0.31.14,P=1 S=8 A=1
+49,fresh,SzZqmxuEvYo,ok,1,1,328,2.59,12.1,15,12,8800,12,1,1,,0,sabr:2,0.31.14,P=1 S=5 A=1
+50,observe,t8hjTa1IeNc,ok,1,1,936,2.72,6.89,5,3,4000,0,0,1,,0,sabr:observe,0.31.14,P=2 S=6 A=1
+51,fresh,h33WYgDwQhc,ok,0,0,502,2.92,1.75,0,0,0,0,0,1,,0,sabr:2,0.31.14,none
+52,observe,enP7-T3Hhjw,ok,1,1,602,2.98,18.28,6,2,16800,0,0,1,,0,sabr:observe,0.31.14,P=4 S=5 A=1
+53,fresh,0XrPLBSlopQ,ok,0,0,1340,2.74,2.96,4,2,2000,2,1,1,,0,sabr:2,0.31.14,P=8 A=1
+54,observe,qTOBOvq7Wzo,ok,1,1,339,2.87,11.38,2,1,9600,0,0,1,,0,sabr:observe,0.31.14,P=1 S=5 A=1
+55,fresh,C07l-nhWIuI,ok,1,0,620,2.64,3.06,5,3,9600,3,1,1,,0,sabr:2,0.31.14,P=4 S=5 A=1
+56,observe,pY-UiRNQCdE,ok,1,1,1206,2.99,25.5,7,4,24000,0,0,1,,0,sabr:observe,0.31.14,P=10 S=6 A=1
+57,fresh,e2oYSyT2aFQ,ok,1,0,1183,2.94,3.17,6,3,12800,3,1,1,,0,sabr:2,0.31.14,P=4 S=6 A=1
+58,observe,q6qXHN4Q2qQ,ok,1,1,1422,2.96,17.06,6,4,14741,0,0,1,,0,sabr:observe,0.31.14,P=8 S=8 A=1
+59,fresh,tp5IB39nT_4,ok,1,1,499,2.71,15.09,18,16,16800,16,1,1,,0,sabr:2,0.31.14,P=1 S=5 A=1
+60,observe,jF112z1gSLI,ok,1,1,1402,2.58,10.58,2,1,8800,0,0,1,,0,sabr:observe,0.31.14,P=7 S=5 A=1
+61,fresh,5psJ73MxtMM,ok,1,0,735,2.87,2.86,3,2,16800,2,1,1,,0,sabr:2,0.31.14,P=4 S=5 A=1
+62,observe,RqYEhjuxeuM,ok,1,1,1039,2.62,10.61,2,1,8800,0,0,1,,0,sabr:observe,0.31.14,P=1 S=6 A=1
+63,fresh,6wCThAW5qMY,ok,1,0,3183,2.59,2.55,5,3,16800,3,1,1,,0,sabr:2,0.31.14,P=10 S=5 A=1
+64,observe,VBUsyux7Y3c,ok,1,1,373,2.78,11.45,2,1,9600,0,0,1,,0,sabr:observe,0.31.14,P=1 S=5 A=1
+65,fresh,KkvaB8DUhwA,ok,1,0,648,2.67,3.1,5,3,9600,3,1,1,,0,sabr:2,0.31.14,P=4 S=3 A=1
+66,observe,rO09v72zDwA,ok,1,1,355,2.91,11.29,6,2,9600,0,0,1,,0,sabr:observe,0.31.14,P=1 S=6 A=1
+67,fresh,7HuqW8CACkc,ok,1,0,1439,2.91,2.82,5,3,4000,3,1,1,,0,sabr:2,0.31.14,P=3 S=8 A=1
+68,observe,IkfPcu7fG3M,ok,1,1,1025,2.76,11.53,6,2,9600,0,0,1,,0,sabr:observe,0.31.14,P=1 S=5 A=1
+69,fresh,smEMTPd2VgY,ok,1,0,844,3.02,2.65,3,2,8800,2,1,1,,0,sabr:2,0.31.14,P=2 S=5 A=1
+70,observe,8aBvuRwcbds,ok,1,1,3379,2.88,10.83,2,1,8800,0,0,1,,0,sabr:observe,0.31.14,P=13 S=5 A=1
+71,fresh,5SmaLAYT37Q,ok,1,1,886,2.61,24.86,30,25,20800,25,1,1,,0,sabr:2,0.31.14,P=6 S=5 A=1
+72,observe,pGvPipzTK-M,ok,1,1,113,2.94,9.27,5,3,8000,0,0,1,,0,sabr:observe,0.31.14,P=1 S=4 A=1
+73,fresh,eDCorruzCck,ok,1,1,978,3.04,22.79,27,23,24000,23,1,1,,0,sabr:2,0.31.14,P=8 S=6 A=1
+74,observe,F8r_8K2MkR0,ok,1,1,1461,2.62,14.67,2,1,12800,0,0,1,,0,sabr:observe,0.31.14,P=23 S=6 A=1
+75,fresh,25Hf_RlP6aY,ok,1,0,533,2.63,3.04,3,2,8000,2,1,1,,0,sabr:2,0.31.14,P=1 S=8 A=1
+76,observe,bvknbZtbXKA,ok,1,1,934,2.61,11.52,5,3,9541,0,0,1,,0,sabr:observe,0.31.14,P=11 S=6 A=1
+77,fresh,lYhwMFQ-KKY,ok,1,1,481,2.98,22.82,26,22,20000,22,1,1,,0,sabr:2,0.31.14,P=3 S=7 A=1
+78,observe,T2QIL4HlufQ,ok,1,1,3600,3.03,29.86,7,3,28000,0,0,1,,0,sabr:observe,0.31.14,P=21 S=5 A=1
+79,fresh,LQuUHAPl2CU,ok,1,1,956,3,22.96,27,23,20000,23,1,1,,0,sabr:2,0.31.14,P=3 S=5 A=1
+80,observe,wRmxCWvodMI,ok,1,1,920,3.02,21.55,2,1,20000,0,0,1,,0,sabr:observe,0.31.14,P=7 S=6 A=1
+81,fresh,UXV8u8hZ9SU,ok,1,1,481,2.95,20.45,23,19,16800,19,1,1,,0,sabr:2,0.31.14,P=3 S=5 A=1
+82,observe,yHCravpCXTU,ok,0,0,1257,3,1.59,3,1,2000,0,0,1,,0,sabr:observe,0.31.14,none
+83,fresh,q_GRHPLK5FY,ok,1,1,262,2.81,19.47,26,21,16000,21,1,1,,0,sabr:2,0.31.14,P=1 S=2 A=1
+84,observe,VVXZ_LcjxkY,ok,1,1,527,2.86,17.48,2,1,16000,0,0,1,,0,sabr:observe,0.31.14,P=4 S=6 A=1
+85,fresh,QYU3gd7aoM8,ok,1,1,693,2.8,12.56,15,12,20000,12,1,1,,0,sabr:2,0.31.14,P=5 S=5 A=1
+86,observe,FN93WoPDJS0,ok,1,1,929,2.58,5.67,2,1,4000,0,0,1,,0,sabr:observe,0.31.14,P=3 S=6 A=1
+87,fresh,OSp9ETkSk5I,ok,1,1,801,2.89,11.83,15,12,8800,12,1,1,,0,sabr:2,0.31.14,P=5 S=6 A=1
+88,observe,-86d_lUalVE,ok,1,1,479,2.84,14.48,6,3,12800,0,0,1,,0,sabr:observe,0.31.14,P=1 S=7 A=1
+89,fresh,Cpl373FOntY,ok,1,1,600,2.89,6.9,10,7,4000,7,1,1,,0,sabr:2,0.31.14,P=5 S=8 A=1
+90,observe,jU-UhSPTTzM,ok,1,1,4639,2.94,10.28,2,1,8800,0,0,1,,0,sabr:observe,0.31.14,P=26 S=5 A=1
+91,fresh,R_T0pKInfjc,live,1,1,inf,0,,13,4,9600,4,1,1,An error occurred. Please try again later. (Playba,1,sabr:2,0.31.14,P=1 S=5 A=1
+92,observe,faauxPk-Kio,ok,1,1,950,2.73,11.47,2,1,9600,0,0,1,,0,sabr:observe,0.31.14,P=6 S=5 A=1
+93,fresh,yocInfqlYqw,ok,1,0,1413,2.83,2.91,5,3,16000,3,1,1,,0,sabr:2,0.31.14,P=2 S=6 A=1
+94,observe,aHHbIPkbIio,ok,1,1,949,3,11.82,2,1,9600,0,0,1,,0,sabr:observe,0.31.14,P=1 S=5 A=1
+95,fresh,TOVJCXhRcjM,ok,1,0,2567,2.6,3.39,3,2,8800,2,1,1,,0,sabr:2,0.31.14,P=14 S=7 A=1
+96,observe,kmfh0-EKxD8,nosettle,1,1,302,74.57,,23,8,12396,0,0,1,,0,sabr:observe,0.31.14,P=6 S=7 A=1
+97,fresh,2xm-8pIY3IA,ok,1,0,1698,2.87,2.87,3,2,9600,2,1,1,,0,sabr:2,0.31.14,P=11 S=5 A=1
+98,observe,Hc4LNjO24T4,ok,0,0,936,2.72,1.98,2,1,2000,0,0,1,,0,sabr:observe,0.31.14,P=7 A=1
+99,fresh,Y_INVrUN_h0,ok,1,0,527,2.72,2.48,3,2,4000,2,1,1,,0,sabr:2,0.31.14,P=3 S=6 A=1
+100,observe,SDQEaJY291A,ok,1,1,1221,2.95,10.26,6,2,8800,0,0,1,,0,sabr:observe,0.31.14,P=2 S=6 A=1
+101,fresh,MoghC9wt3o4,ok,1,1,485,2.75,13.01,19,14,16800,14,1,1,,0,sabr:2,0.31.14,P=3 S=5 A=1
+102,observe,SQHYLefh4x4,ok,0,0,587,2.96,1.68,0,0,0,0,0,1,,0,sabr:observe,0.31.14,none
+103,fresh,o77RGda5XR0,ok,1,1,923,2.83,12.48,15,12,12800,12,1,1,,0,sabr:2,0.31.14,P=4 S=7 A=1
+104,observe,Zcs4w1veEjU,ok,0,0,617,2.6,1.5,2,1,2000,0,0,1,,0,sabr:observe,0.31.14,none
+105,fresh,Ltx82AZAOhs,ok,1,0,454,2.77,2.85,6,3,9600,3,1,1,,0,sabr:2,0.31.14,P=1 S=5 A=1
+106,observe,BN28vjg2LVs,ok,0,0,270,2.98,1.16,2,1,2000,0,0,1,,0,sabr:observe,0.31.14,none
+107,fresh,s-ArwEzr-2M,ok,1,0,494,3.08,2.57,5,3,8800,3,1,1,,0,sabr:2,0.31.14,P=3 S=6 A=1
+108,observe,6a_0TP-pj8Q,ok,1,1,1110,2.98,9.76,7,5,12912,0,0,1,,0,sabr:observe,0.31.14,P=6 S=7 A=1
+109,fresh,b2v4brHpdxY,ok,1,0,314,2.58,2.62,5,3,8800,3,1,1,,0,sabr:2,0.31.14,P=1 S=5 A=1
+110,observe,zxW-b2pFu5U,ok,1,1,327,3.04,5.73,5,2,4000,0,0,1,,0,sabr:observe,0.31.14,P=1 S=6 A=1
+111,fresh,a8DTOztiuLM,ok,1,0,1052,2.66,2.49,3,2,8800,2,1,1,,0,sabr:2,0.31.14,P=4 S=7 A=1
+112,observe,gtIGgs_y2nY,ok,1,1,743,2.63,10.58,2,1,8800,0,0,1,,0,sabr:observe,0.31.14,P=5 S=5 A=1
+113,fresh,XGzLL5rvUaU,ok,1,0,1247,2.59,3.1,5,5,15026,5,1,1,,0,sabr:2,0.31.14,P=6 S=6 A=1
+114,observe,9y2C8qoJptA,ok,1,1,1557,2.96,18.46,6,2,16800,0,0,1,,0,sabr:observe,0.31.14,P=7 S=6 A=1
+115,fresh,SLJTwFQE10A,ok,1,0,1402,2.69,2.95,3,3,20000,3,1,1,,0,sabr:2,0.31.14,P=4 S=5 A=1
+116,observe,H4hAegl_wfM,ok,1,1,992,2.57,10.14,2,1,8800,0,0,1,,0,sabr:observe,0.31.14,P=6 S=6 A=1
+117,fresh,kR1buRTIKhk,ok,1,1,1000,2.6,11.9,15,13,8800,13,1,1,,0,sabr:2,0.31.14,P=4 S=6 A=1
+118,observe,OA1erudeOps,ok,1,1,1567,2.7,5.44,2,1,4000,0,0,1,,0,sabr:observe,0.31.14,P=6 S=6 A=1
+119,fresh,x6XKOUDn0Z8,ok,1,0,307,2.59,2.56,5,3,8800,3,1,1,,0,sabr:2,0.31.14,P=1 S=6 A=1
+120,observe,aPyhrVN4LTg,ok,1,1,235,2.84,11.44,6,2,9600,0,0,1,,0,sabr:observe,0.31.14,P=1 S=6 A=1
+121,fresh,X4TK6CYeFJM,ok,1,0,1269,2.83,2.84,3,2,8800,2,1,1,,0,sabr:2,0.31.14,P=5 S=3 A=1
+122,observe,Kmx9OTnaiy8,ok,1,1,736,2.94,11.47,6,2,9600,0,0,1,,0,sabr:observe,0.31.14,P=3 S=3 A=1
+123,fresh,rhcDSzw-MOk,ok,1,1,381,3.07,20.09,21,18,16000,18,1,1,,0,sabr:2,0.31.14,P=1 S=3 A=1
+124,observe,Gnl-ZnH_PsE,ok,1,1,368,3,10.21,2,1,8800,0,0,1,,0,sabr:observe,0.31.14,P=1 S=5 A=1
+125,fresh,3DAgLpPXVCs,ok,1,0,719,2.7,3,5,3,9600,3,1,1,,0,sabr:2,0.31.14,P=5 S=5 A=1
+126,observe,5EV_WSIyR-w,ok,1,1,610,2.6,21.33,6,2,20000,0,0,1,,0,sabr:observe,0.31.14,P=4 S=5 A=1
+127,fresh,nIoOv6lWYnk,ok,1,0,821,2.78,3.13,5,3,9600,3,1,1,,0,sabr:2,0.31.14,P=7 S=5 A=1
+128,observe,ZzLPUoetSHw,ok,1,1,1350,2.76,17.61,2,1,16000,0,0,1,,0,sabr:observe,0.31.14,P=9 S=6 A=1
+129,fresh,UwypZI-E9yc,ok,1,0,588,2.6,2.75,3,2,8800,2,1,1,,0,sabr:2,0.31.14,P=3 S=5 A=1
+130,observe,QBcZwHpaqB4,ok,1,1,658,2.58,5.64,2,1,4000,0,0,1,,0,sabr:observe,0.31.14,P=2 S=6 A=1
+131,fresh,196q4mxbjWY,ok,1,0,296,2.79,2.85,3,2,9600,2,1,1,,0,sabr:2,0.31.14,P=1 S=5 A=1
+132,observe,wd2eLT5SrZs,ok,0,0,170,2.76,1.42,2,1,2000,0,0,1,,0,sabr:observe,0.31.14,none
+133,fresh,3ptagZOU_Wg,ok,1,0,1221,2.9,2.88,3,2,20800,2,1,1,,0,sabr:2,0.31.14,P=11 S=5 A=1
+134,observe,geAVc3F_GkA,ok,1,1,3846,3.03,11.8,6,3,13279,0,0,1,,0,sabr:observe,0.31.14,P=22 S=5 A=1
+135,fresh,huBM4lBKJpk,ok,1,0,734,2.79,2.91,3,2,4000,2,1,1,,0,sabr:2,0.31.14,P=5 S=6 A=1
+136,observe,AoktpjjCLdM,ok,1,1,1958,2.7,29.8,2,1,28000,0,0,1,,0,sabr:observe,0.31.14,P=13 S=5 A=1
+137,fresh,SiXTjqsIPs8,ok,1,0,750,2.82,3.58,3,2,16000,2,1,1,,0,sabr:2,0.31.14,P=5 S=6 A=1
+138,observe,hkjx8_poaUg,ok,1,1,153,2.6,11.61,2,1,9600,0,0,1,,0,sabr:observe,0.31.14,P=1 S=5 A=1
+139,fresh,EGeNKGosXA8,ok,1,0,435,2.94,3.01,3,2,8800,2,1,1,,0,sabr:2,0.31.14,P=1 S=6 A=1
+140,observe,7gNqLRbX8uM,ok,1,1,669,3,19.39,6,3,16800,0,0,1,,0,sabr:observe,0.31.14,P=5 S=5 A=1
+141,fresh,ytAKyGKTdW8,ok,1,1,1989,2.89,4.88,3,2,8800,2,1,1,,0,sabr:2,0.31.14,P=7 S=5 A=1
+142,observe,DzqHq2-TVD4,ok,1,1,28,2.85,6.34,2,1,4800,0,0,1,,0,sabr:observe,0.31.14,S=2 A=1
+143,fresh,3wAQxJeyyXo,ok,1,0,647,2.89,3.32,3,3,12373,3,1,1,,0,sabr:2,0.31.14,P=5 S=5 A=1
+144,observe,KUzYFMgWs4w,ok,1,1,913,2.95,10.76,2,1,8800,0,0,1,,0,sabr:observe,0.31.14,P=6 S=5 A=1
+145,fresh,40MiH9-FQ5w,ok,1,1,866,2.97,3.72,3,2,9600,2,1,1,,0,sabr:2,0.31.14,P=4 S=5 A=1
+146,observe,nE9qUio0OyE,ok,1,1,2134,2.65,11.75,2,1,9600,0,0,1,,0,sabr:observe,0.31.14,P=12 S=5 A=1
+147,fresh,tbO1lJ4PgCY,ok,1,0,2248,3.05,3.59,3,2,16800,2,1,1,,0,sabr:2,0.31.14,P=11 S=5 A=1
+148,observe,4JsqDE7NuYQ,ok,1,1,914,2.74,10.54,2,1,8800,0,0,1,,0,sabr:observe,0.31.14,P=2 S=5 A=1
+149,fresh,2zHvT_XHRl8,ok,1,0,1351,2.88,2.78,3,2,16800,2,1,1,,0,sabr:2,0.31.14,P=4 S=5 A=1
+150,observe,dfo6W2LiXSo,ok,1,1,655,2.75,11.48,2,1,9600,0,0,1,,0,sabr:observe,0.31.14,P=3 S=6 A=1
+151,fresh,t2gJJuZNrz4,ok,1,0,494,2.83,3.42,3,2,9600,2,1,1,,0,sabr:2,0.31.14,P=2 S=5 A=1
+152,observe,5VVMwzvajaA,ok,1,1,788,2.66,11.63,6,2,9600,0,0,1,,0,sabr:observe,0.31.14,P=8 S=5 A=1
+153,fresh,JI5id4xksSU,ok,1,0,765,2.96,3.32,5,3,8000,3,1,1,,0,sabr:2,0.31.14,P=2 S=7 A=1
+154,observe,mwqirFh3Jvo,ok,1,1,388,3.15,10.37,6,3,8800,0,0,1,,0,sabr:observe,0.31.14,P=1 S=6 A=1
+155,fresh,JwQhhAzzsx0,ok,1,0,484,2.87,2.82,3,2,9600,2,1,1,,0,sabr:2,0.31.14,P=4 S=5 A=1
+156,observe,CMVIIPWFuFw,ok,1,1,555,3.06,14.48,2,1,12800,0,0,1,,0,sabr:observe,0.31.14,P=4 S=6 A=1
+157,fresh,2JJXVWda24M,ok,1,0,456,2.95,2.82,5,3,8800,3,1,1,,0,sabr:2,0.31.14,P=1 S=5 A=1
+158,observe,ksk36W2vCoM,nosettle,1,1,302,67.33,,23,7,8000,0,0,1,,0,sabr:observe,0.31.14,P=5 S=8 A=1
+159,fresh,ebOt0sHYC0c,ok,1,0,1151,2.93,3.23,5,3,8800,3,1,1,,0,sabr:2,0.31.14,P=2 S=5 A=1
+160,observe,kJAWT-jyREI,ok,1,1,1404,2.9,16.96,7,3,8000,0,0,1,,0,sabr:observe,0.31.14,P=6 S=8 A=1
+161,fresh,5K-AC4J-Z_c,ok,1,0,742,2.81,2.84,3,2,9600,2,1,1,,0,sabr:2,0.31.14,P=5 S=5 A=1
+162,observe,BXWKKETxxrE,ok,1,1,1235,2.83,11.34,2,1,9600,0,0,1,,0,sabr:observe,0.31.14,P=7 S=5 A=1
+163,fresh,386DxYrYv30,ok,1,0,1262,2.87,3.01,5,3,8800,3,1,1,,0,sabr:2,0.31.14,P=9 S=5 A=1
+164,observe,NWfx8Hz7RAE,ok,1,1,90,3.01,6.64,2,1,4800,0,0,1,,0,sabr:observe,0.31.14,P=1 S=2 A=1
+165,fresh,MsRQsusvft8,ok,1,0,230,3.01,2.72,3,2,8800,2,1,1,,0,sabr:2,0.31.14,P=1 S=5 A=1
+166,observe,i0DGyEmpjyQ,ok,0,0,357,2.96,1.71,0,0,0,0,0,1,,0,sabr:observe,0.31.14,none
+167,fresh,LpXDilDM3XM,ok,0,0,1855,2.91,10.36,5,1,2000,1,1,1,,0,sabr:2,0.31.14,none
+168,observe,wmpOW07N8yc,ok,0,0,1800,2.88,1.78,0,0,0,0,0,1,,0,sabr:observe,0.31.14,none
+169,fresh,tH38Ieam51A,ok,1,0,179,2.82,2.97,3,2,8800,2,1,1,,0,sabr:2,0.31.14,P=1 S=5 A=1
+170,observe,7ylVRqfKfvM,ok,1,1,494,2.62,10.81,2,1,8800,0,0,1,,0,sabr:observe,0.31.14,P=1 S=5 A=1
+171,fresh,uS1zSSyZc_c,ok,1,0,1893,2.73,3.01,5,3,8800,3,1,1,,0,sabr:2,0.31.14,P=4 S=5 A=1
+172,observe,Q94D0zEPjOI,ok,0,0,1042,2.71,1.53,2,1,2000,0,0,1,,0,sabr:observe,0.31.14,none
+173,fresh,MumeyBO37aI,ok,1,0,599,2.62,3.12,5,4,10314,4,1,1,,0,sabr:2,0.31.14,P=1 S=5 A=1
+174,observe,2yxsBi1aegw,ok,1,1,1560,2.73,14.73,6,3,12800,0,0,1,,0,sabr:observe,0.31.14,P=10 S=6 A=1
+175,fresh,tkO9CKjNnr8,ok,1,0,456,2.73,3.06,5,3,9600,3,1,1,,0,sabr:2,0.31.14,P=1 S=5 A=1
+176,observe,Mu2arpNyVQs,ok,1,1,543,2.95,10.9,2,1,8800,0,0,1,,0,sabr:observe,0.31.14,P=4 S=5 A=1
+177,fresh,GZTPedRN2FE,ok,1,0,1590,2.69,2.94,5,4,8800,4,1,1,,0,sabr:2,0.31.14,P=10 S=5 A=1
+178,observe,g38_vsXIoIc,ok,0,0,1556,2.94,1.65,2,1,2000,0,0,1,,0,sabr:observe,0.31.14,none
+179,fresh,dNqmjg_knoU,ok,0,0,1208,3.02,3.23,2,2,12026,2,1,1,,0,sabr:2,0.31.14,none
+180,observe,Dn19wDU6cBE,ok,0,0,214,2.82,1.3,0,0,0,0,0,1,,0,sabr:observe,0.31.14,none
+181,fresh,eVw7sBzh-I4,ok,1,0,697,2.93,3.64,3,2,9600,2,1,1,,0,sabr:2,0.31.14,P=5 S=5 A=1
+182,observe,EmChX6nTCEE,ok,1,1,290,2.64,10.55,2,1,8800,0,0,1,,0,sabr:observe,0.31.14,P=1 S=5 A=1
+183,fresh,h6faatE8b9Q,ok,1,1,147,3.08,8.52,6,4,8119,4,1,1,,0,sabr:2,0.31.14,P=1 S=8 A=1
+184,observe,oIz8QNVb4P8,nosettle,1,1,302,74.77,,15,6,8000,0,0,1,,0,sabr:observe,0.31.14,P=1 S=8 A=1
+185,fresh,pagPuiuA9cY,ok,1,0,357,2.89,3.01,5,3,16000,3,1,1,,0,sabr:2,0.31.14,P=1 S=2 A=1
+186,observe,Cyvtgc5sB-M,ok,1,1,1499,2.8,10.54,2,1,8800,0,0,1,,0,sabr:observe,0.31.14,P=9 S=5 A=1
+187,fresh,y5xG4GChWCA,ok,0,0,331,3.06,1.04,0,0,0,0,0,1,,0,sabr:2,0.31.14,none
+188,observe,8AO_Qd0XsBo,ok,0,0,701,2.61,1.65,2,2,5545,0,0,1,,0,sabr:observe,0.31.14,none
+189,fresh,tahaaHxhbsA,ok,1,0,505,3.04,2.59,3,2,9600,2,1,1,,0,sabr:2,0.31.14,P=4 S=5 A=1
+190,observe,shml94rfXY4,ok,1,1,134,2.86,17.79,6,3,8000,0,0,1,,0,sabr:observe,0.31.14,P=1 S=8 A=1
+191,fresh,x6yChn8TgDI,ok,1,0,4135,2.63,3.03,5,4,9425,4,1,1,,0,sabr:2,0.31.14,P=24 S=6 A=1
+192,observe,t-_qzsMF8RM,nosettle,1,1,302,67.94,,23,8,12109,0,0,1,,0,sabr:observe,0.31.14,P=6 S=8 A=1
+193,fresh,kw9VpWEz0kI,ok,1,0,528,2.94,3.29,5,4,14225,4,1,1,,0,sabr:2,0.31.14,P=5 S=8 A=1
+194,observe,0fxL8v2dMho,ok,1,1,467,2.9,17.81,5,2,16000,0,0,1,,0,sabr:observe,0.31.14,P=1 S=2 A=1
+195,fresh,Wk3scs5FqCY,ok,1,0,357,2.67,3.03,3,2,8800,2,1,1,,0,sabr:2,0.31.14,P=1 S=5 A=1
+196,observe,RKvYYWpvZ8Q,ok,1,1,1230,2.81,11.53,6,2,9600,0,0,1,,0,sabr:observe,0.31.14,P=7 S=5 A=1
+197,fresh,4H8BuszuxI8,ok,1,0,220,3.04,2.63,3,2,4000,2,1,1,,0,sabr:2,0.31.14,P=1 S=8 A=1
+198,observe,PHsKLoLMQcA,ok,1,1,616,3.04,17.87,6,4,14661,0,0,1,,0,sabr:observe,0.31.14,P=3 S=8 A=1
+199,fresh,yq1y9-QkRXM,ok,1,0,972,2.85,2.73,3,2,8800,2,1,1,,0,sabr:2,0.31.14,P=5 S=6 A=1

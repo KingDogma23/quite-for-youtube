@@ -1,0 +1,47 @@
+i,arm,id,cls,S,dur,ct,navDeficit,extDeficit,adSeen,adVisibleMs,settledAt,switches,version,vis,focus,cold
+0,on,D2_4Z9Dozcs,ok,0,10,2.89,5.24,-0.15,0,,8125,none,0.31.13,visible,false,none
+1,off,HMBLyga1pzs,ok,0,1228,2.92,16.95,7.57,1,14628,19869,off,0.31.13,visible,false,
+2,on,m_Zk_PaML6o,ok,1,176,3.05,13.14,11.77,1,0,16189,none,0.31.13,visible,false,P=1 S=3 A=1
+3,off,-lQk1giPuck,ok,0,315,2.61,10.08,8.69,1,508,12693,off,0.31.13,visible,false,
+4,on,l_XVuRxULkw,ok,0,15,2.87,1.25,-0.3,0,,4115,none,0.31.13,visible,false,none
+5,off,u6QgucGou0g,ok,0,30,2.69,8.99,7.62,1,7038,11680,off,0.31.13,visible,false,
+6,on,0rwVJ0Ie-rQ,ok,1,1645,2.95,9.67,8.37,1,7531,12622,none,0.31.13,visible,false,P=6 S=7 A=1
+7,off,3xAFhSxm7F0,ok,0,64,2.7,6.06,4.61,1,0,8762,off,0.31.13,visible,false,
+8,on,o7JE84ZYAhk,ok,1,48,2.74,9.37,7.55,1,7526,12108,none,0.31.13,visible,false,S=4 A=1
+9,off,EihxZ2KXuHA,ok,0,2798,2.59,21.35,19.86,1,1098,23937,off,0.31.13,visible,false,
+10,on,khclyGpZ9ng,ok,0,173,3.01,1.1,-0.32,0,,4108,none,0.31.13,visible,false,none
+11,off,cQhsEIHrI_s,ok,0,20,2.92,1.75,-0.31,0,,4674,off,0.31.13,visible,false,
+12,on,Y4GKg34DGdI,ok,1,15,2.7,5.93,4.71,1,0,8628,none,0.31.13,visible,false,S=2 A=1
+13,off,-4cr0t3_y_I,ok,0,44,2.6,6.03,4.65,1,0,8634,off,0.31.13,visible,false,
+14,on,HxQiEtrpqzs,ok,1,437,3.03,18.74,17.62,1,16620,21769,none,0.31.13,visible,false,P=1 S=8 A=1
+15,off,nmG5_a0T3xo,ok,0,558,2.99,1.2,-0.32,0,,4186,off,0.31.13,visible,false,
+16,on,lSKB3L7_4Qg,ok,1,159,2.85,13.4,11.92,1,0,16248,none,0.31.13,visible,false,P=1 S=3 A=1
+17,off,ko70cExuzZM,ok,0,238,2.79,5.48,3.82,1,1560,8267,off,0.31.13,visible,false,
+18,on,0GVExpdmoDs,ok,1,229,2.81,17.47,15.76,1,0,20284,none,0.31.13,visible,false,P=1 S=3 A=1
+19,off,LPbnGkKDoFw,ok,0,195,3.04,1.55,-0.29,0,,4592,off,0.31.13,visible,false,
+20,on,QY4B5_KLnb0,ok,1,182,2.62,17.12,15.75,1,0,19737,none,0.31.13,visible,false,P=1 S=2 A=1
+21,off,WDUvMdaVm9k,ok,0,15,2.82,1.44,-0.33,0,,4260,off,0.31.13,visible,false,
+22,on,aDqzDoJPkaA,ok,1,590,3.08,11.14,10.12,1,501,14217,none,0.31.13,visible,false,P=4 S=5 A=1
+23,off,P42Zb3ZvHk0,ok,0,1381,2.58,5.07,3.82,1,1009,7646,off,0.31.13,visible,false,
+24,on,FX6t7--6dAw,ok,1,2152,3.06,21.29,20,1,502,24345,none,0.31.13,visible,false,P=4 S=3 A=1
+25,off,k6WNXMLTB5o,nosettle,0,181,89.36,,,1,89974,,off,0.31.13,visible,false,
+26,on,7t-Et4SQwxQ,ok,1,1192,2.98,10.34,8.89,1,1008,13318,none,0.31.13,visible,false,P=2 S=5 A=1
+27,off,VRngWBIaNdY,ok,0,4298,2.93,22.49,20.4,1,2082,25418,off,0.31.13,visible,false,
+28,on,ulRVAPJs8wY,ok,1,174,2.86,14.45,13.13,1,8040,17314,none,0.31.13,visible,false,P=1 S=6 A=1
+29,off,m7k9UMcHbr0,ok,0,191,3.01,10.31,8.77,1,2627,13320,off,0.31.13,visible,false,
+30,on,FGBLzMESBAo,ok,0,150,2.93,1.72,-0.3,0,,4654,none,0.31.13,visible,false,none
+31,off,K7-sDF9SpFI,ok,0,183,2.96,13.24,11.75,1,0,16204,off,0.31.13,visible,false,
+32,on,vJwKKKd2ZYE,ok,1,198,2.85,17.56,15.8,1,0,20414,none,0.31.13,visible,false,P=1 S=2 A=1
+33,off,cRPBp2tRxFY,ok,0,1300,2.89,17.93,16.81,1,501,20819,off,0.31.13,visible,false,
+34,on,vqKXEF4s2Hk,nosettle,1,187,82.54,,,1,89561,,none,0.31.13,visible,false,P=11 S=8 A=1
+35,off,ljItjePnX6Y,ok,0,657,2.58,16.62,15.13,1,14584,19202,off,0.31.13,visible,false,
+36,on,CicuB_kTn7Q,ok,0,30,2.69,1.44,-0.21,0,,4126,none,0.31.13,visible,false,none
+37,off,pSHVbLPWA28,ok,0,669,2.76,5.4,3.9,1,1002,8162,off,0.31.13,visible,false,
+38,on,ba62uuv-5Dc,ok,1,134,2.64,5.56,3.9,1,1006,8202,none,0.31.13,visible,false,P=1 S=5 A=1
+39,off,I-5e_J3LWS8,nosettle,0,302,90.31,,,1,89937,,off,0.31.13,visible,false,
+40,on,pk7AvBnAUEY,ok,0,27,3.3,0.9,-0.35,0,,4199,none,0.31.13,visible,false,none
+41,off,ZZYuIgDB32o,ok,0,1728,2.77,14.98,13.48,1,12555,17752,off,0.31.13,visible,false,
+42,on,np09IR4ySxE,ok,1,6646,2.71,21.35,19.93,1,2009,24060,none,0.31.13,visible,false,P=61 S=5 A=1
+43,off,SDXRY-QCYgg,ok,0,766,2.9,5.8,4.13,1,1504,8696,off,0.31.13,visible,false,
+44,on,cmwQNIgrddo,ok,1,1440,2.84,10.49,8.98,1,1002,13327,none,0.31.13,visible,false,P=9 S=5 A=1
+45,off,lczVMeA4gAQ,ok,0,1213,2.76,5.4,3.81,1,1516,8161,off,0.31.13,visible,false,
