@@ -100,7 +100,13 @@
   // ?ytacoff=1 and ?ytacnoinject=1 already do that. 0.31.4 wired it into off(),
   // which is the master bypass, so the A/B arm run on 2026-08-29 measured
   // "inject.js entirely off" while claiming to measure "rewrite off".
-  const NO_REWRITE = location.search.indexOf("ytacnorewrite=1") !== -1;
+  // OFF BY DEFAULT since 0.31.23. Bisected on the live site 2026-09-02: with
+  // only the response rewrite left on, the anti-adblock wall appears and the
+  // video never gets a media source (readyState 0). With it off and the prune
+  // scoped, the same video plays at readyState 4. It was also measured across
+  // 200 loads to make no difference to whether an advert appeared, so it was
+  // costing the wall and buying nothing. ?ytacrewrite=1 turns it back on.
+  const NO_REWRITE = location.search.indexOf("ytacrewrite=1") === -1;
 
   // ?ytacsabr= — the SABR backoff. Read ONCE, like NO_REWRITE above; two reads
   // of one switch is how they came to disagree.
@@ -550,6 +556,7 @@
     return;
   }
 
+
   // ?ytacnoinject=1 — everything else stays on, only this file stands down.
   //
   // Measured on 2026-08-26: across 20 videos, one load each, six never got
@@ -565,6 +572,156 @@
       /* reporting only */
     }
     return;
+  }
+
+  /**
+   * PARSE-TIME PRUNING — ?ytacjsonprune=1
+   *
+   * The one structural difference left between this file and Adblock for
+   * Youtube 7.2.5, which works on the same account where this extension is
+   * walled. Read from its source on 2026-09-02:
+   *
+   *   nativeJSONParse = JSON.parse
+   *   JSON.parse = (...a) => jsonPruner(nativeJSONParse.apply(JSON, a))
+   *   Response.prototype.json = function () {
+   *     return nativeJson.apply(this).then(jsonPruner)
+   *   }
+   *
+   * It DELETES adPlacements, playerAds and adSlots from the object as it is
+   * parsed, so the player never observes them in any state. This file instead
+   * patches fetch and XHR and edits objects that already exist — and every one
+   * of its five attempts at adSlots (getter, delete, empty array,
+   * prune-both-paths, SABR-gated) stalled the player for ~9-17s. Adblock
+   * removes the same key with no stall at all, which says the difference is
+   * WHEN the key disappears, not whether it does.
+   *
+   * Installed AFTER the master bypass, not before. Placed before it in
+   * 0.31.20 and it ran under ?ytacoff=1 — the page was modified while the
+   * switch claimed to be off, which is the exact bug this file already fixed
+   * once and documented above the bypass guard. Any arm measured with that
+   * build is comparing this extension against itself.
+   *
+   * ON by default since 0.31.20. Measured 2026-09-02, four videos per arm,
+   * first frame from the page's own media events:
+   *
+   *   control (no extension)   1,683ms   ads 3/4
+   *   shipped (fetch/XHR)      1,459ms   ads 3/4
+   *   parse-time prune         1,275ms   ads 3/4   24 keys removed per load
+   *
+   * No stall — the fastest arm of the three — while deleting adSlots, which
+   * five earlier attempts could not do without costing ~9-17s. The stall was
+   * never about touching adSlots; it was about touching it after the object
+   * existed.
+   *
+   * It did not reduce adverts IN THIS RIG, but the rig's own control also saw
+   * 3/4, signed out on fresh profiles. Adblock for Youtube blocks 5/5 on the
+   * reader's real signed-in profile, so the rig is not reproducing whatever
+   * path the adverts take there.
+   *
+   * OFF BY DEFAULT since 0.31.24. ?ytacjsonprune=1 turns it on.
+   *
+   * Measured on the live site 2026-09-02, and this is the finding that ends
+   * the argument the whole 0.20-0.31 series was built on:
+   *
+   *   with this extension bypassed and Adblock for Youtube 7.2.5 the only
+   *   blocker acting, the player response still carried adPlacements (11
+   *   entries), playerAds, adSlots and adBreakHeartbeatParams, and an advert
+   *   was PLAYING (ad-showing, currentTime advancing, no wall).
+   *
+   * Adblock does not prune. It is never walled because it does not remove the
+   * advert. There was no working competitor to copy — copying it means letting
+   * the advert play, which is what this default now does.
+   *
+   * Our own bisect the same day, arm by arm on one video:
+   *
+   *   prune on, unscoped   wall, readyState 0, no media source
+   *   prune on, scoped     wall, readyState 0
+   *   response rewrite on  wall, readyState 0
+   *   neither              NO wall, readyState 4, plays
+   *
+   * The clean arm came back clean BETWEEN two walled arms, so this is the
+   * extension load-by-load, not the account and not a sticky flag.
+   */
+  if (location.search.indexOf("ytacjsonprune=1") !== -1) {
+    try {
+      // Adblock for Youtube 7.2.5's own list, read from its source:
+      //   json-prune  playerResponse.adPlacements playerResponse.playerAds
+      //               playerResponse.adSlots adPlacements playerAds adSlots
+      //   json-prune  entries.[-].command.reelWatchEndpoint.adClientParams.isAd
+      // The walk below reaches nested playerResponse objects on its own, so the
+      // prefixed and bare forms are the same three names here.
+      const PRUNE = ["adPlacements", "playerAds", "adSlots"];
+      // Shorts. Their second scriptlet prunes the isAd flag inside a reel
+      // watch endpoint; nothing in this file has ever touched that path, so
+      // Shorts adverts were never addressed at all.
+      const pruneReelAd = (node) => {
+        try {
+          const c = node && node.command && node.command.reelWatchEndpoint;
+          if (c && c.adClientParams && "isAd" in c.adClientParams) {
+            delete c.adClientParams.isAd;
+            return true;
+          }
+        } catch { /* never let a prune break the page */ }
+        return false;
+      };
+      let pruned = 0;
+      // SCOPED, like Adblock's. Its json-prune is gated on
+      //   playerResponse.streamingData.serverAbrStreamingUrl
+      // and URL-scoped to player/watch/get_watch responses. 0.31.20 copied the
+      // technique and dropped the scope: it pruned EVERY object passed through
+      // JSON.parse, six levels deep, 40 keys a load. Bisected on the live site
+      // 2026-09-02 — that unscoped prune triggers the anti-adblock wall on its
+      // own, while google_ad_status does not. Only player payloads now.
+      const isPlayerish = (o) =>
+        !!o && typeof o === "object" &&
+        (!!o.playabilityStatus ||
+          !!(o.streamingData && o.streamingData.serverAbrStreamingUrl) ||
+          !!(o.playerResponse &&
+            (o.playerResponse.playabilityStatus ||
+              (o.playerResponse.streamingData &&
+                o.playerResponse.streamingData.serverAbrStreamingUrl))));
+
+      const prune = (o) => {
+        if (!o || typeof o !== "object") return o;
+        if (!isPlayerish(o)) return o;
+        const seen = new Set();
+        const walk = (node, depth) => {
+          if (!node || typeof node !== "object" || depth > 6 || seen.has(node)) return;
+          seen.add(node);
+          for (const k of PRUNE) {
+            if (Object.prototype.hasOwnProperty.call(node, k)) {
+              try { delete node[k]; pruned++; } catch { /* frozen */ }
+            }
+          }
+          if (pruneReelAd(node)) pruned++;
+          for (const v of Object.values(node)) {
+            if (v && typeof v === "object") walk(v, depth + 1);
+          }
+        };
+        walk(o, 0);
+        try {
+          document.documentElement.setAttribute("data-ytac-jsonpruned", String(pruned));
+        } catch { /* reporting only */ }
+        return o;
+      };
+
+      const nativeParse = JSON.parse;
+      const parseWrapper = function (...a) { return prune(nativeParse.apply(JSON, a)); };
+      hideNative(parseWrapper, nativeParse);
+      JSON.parse = parseWrapper;
+
+      if (typeof Response !== "undefined") {
+        const nativeJson = Response.prototype.json;
+        const jsonWrapper = function () {
+          return nativeJson.apply(this).then(prune);
+        };
+        hideNative(jsonWrapper, nativeJson);
+        Response.prototype.json = jsonWrapper;
+      }
+      document.documentElement.setAttribute("data-ytac-jsonprune", "1");
+    } catch {
+      /* the existing paths still apply */
+    }
   }
 
   guardGlobal("ytInitialPlayerResponse");

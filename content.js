@@ -31,10 +31,15 @@
 (() => {
   "use strict";
 
-  // Read from the manifest so the reported version cannot drift from the
-  // installed one — a self-diagnosing extension misreporting itself is worse
-  // than useless, and this file and manifest.json had already diverged.
-  const VERSION = chrome.runtime.getManifest().version;
+  // A LITERAL, deliberately, and package.sh refuses to build if it disagrees
+  // with manifest.json.
+  //
+  // getManifest() returns the version of the LOADED extension, not of the code
+  // executing. Reload the extension without refreshing the page and this old
+  // content script reports the NEW version while running the OLD logic — it
+  // lies about exactly the thing CLAUDE.md's first gate exists to check, and
+  // twice a result was reported from a build that was not running.
+  const VERSION = "0.31.24";
 
   /**
    * Orphan guard. The Facebook build has had this since 2.4.1; this one never
@@ -1324,6 +1329,14 @@
       respond({
         version: VERSION,
         url: location.pathname,
+        // WHICH ARM THIS IS. Without these two the report cannot tell a
+        // bypassed run from a live one, and on 2026-09-02 a set of skip/rate
+        // numbers was reported from a rig where the content script had never
+        // run at all. A hidden tab reads zero-size rects and a frozen player,
+        // so a reading taken in one is VOID, not merely odd.
+        bypassed:
+          document.documentElement.getAttribute("data-ytac-bypassed") === "1",
+        tabHidden: document.documentElement.getAttribute("data-ytac-hidden"),
         settings: { ...settings },
         session: { ...session },
         lifetime: { ...lifetime },

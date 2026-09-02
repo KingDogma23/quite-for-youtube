@@ -90,7 +90,21 @@ function render(d, stored) {
 
   const s = d.session;
   const reached = s.videoAdsSkipped + s.videoAdsSeeked;
+  // WHICH ARM THIS IS, first line, always — the same marker the other three
+  // extensions carry. A bypassed run and a live one produced identical-looking
+  // reports until this existed.
+  const arm = d.bypassed
+    ? "ARM: BYPASSED (?ytacoff=1) — the extension did nothing on this page"
+    : !d.settings?.enabled
+      ? "ARM: OFF via the popup toggle — the extension did nothing"
+      : "ARM: ACTIVE";
+
   lastReport = [
+    arm,
+    d.tabHidden === "1"
+      ? "** TAB WAS HIDDEN — rects read zero and the player does not hydrate, " +
+        "so this reading is VOID. Re-take it with the window in front. **"
+      : null,
     `Quite for YouTube v${d.version}  (page ${d.url})`,
     `all time: ${lt.adsBlocked} videos protected, ${lt.leaked ?? 0} leaked ` +
     `(rewrite fired, ad played anyway), ${humanTime(lt.secondsSaved)} saved, ` +
@@ -118,7 +132,9 @@ function render(d, stored) {
         `  skip matched: ${s.firstAdSeen.skipMatched.join(" ") || "(none)"}\n` +
         `  duration: ${s.firstAdSeen.videoDuration}  adStateClass: ${s.firstAdSeen.adStateClass}`
       : `first ad seen: none yet`,
-  ].join("\n");
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
 
   $("diag").textContent = lastReport;
 }
