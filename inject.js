@@ -182,6 +182,73 @@
     (!!o.playabilityStatus ||
       !!(o.streamingData && o.streamingData.serverAbrStreamingUrl));
 
+  /**
+   * Make a patched function report the native one when inspected.
+   *
+   * Measured 2026-09-02 on the reader's own browser, both extensions live:
+   *
+   *   window.fetch (ours)          Function.prototype.toString -> NOT native
+   *   XHR.open     (ours)          NOT native
+   *   JSON.parse   (Adblock)       native
+   *   Response.json(Adblock)       native
+   *
+   * Any page can run
+   *   Function.prototype.toString.call(window.fetch).includes('[native code]')
+   * and know an extension is intercepting. This file patched fetch three times
+   * and XHR twice and masked none of them, so it announced itself on every
+   * load.
+   *
+   * Setting wrapper.toString alone is not enough: Function.prototype.toString
+   * ignores an own toString property and reads the internal source. So the
+   * mapping is kept in a WeakMap and Function.prototype.toString itself is
+   * routed through it — then hidden the same way, or it becomes the tell.
+   *
+   * This reduces the fingerprint; it is not a guarantee. An === comparison
+   * against a pristine Function.prototype.toString from a fresh iframe still
+   * detects it. It closes the one-line check, not the determined one.
+   */
+  const NATIVE_OF = new WeakMap();
+
+  // ?ytacdeepmask=1 — ALSO route Function.prototype.toString through the map,
+  // which is the only way to defeat
+  //   Function.prototype.toString.call(window.fetch)
+  // rather than merely String(window.fetch).
+  //
+  // OFF by default, deliberately. Replacing Function.prototype.toString is a
+  // global change to a primitive YouTube's own code uses, and in the first
+  // regression run one video of four never started (it did not reproduce in a
+  // second run: 0/4). One unexplained stall in eight loads against none in
+  // eight control loads is not enough to ship a global prototype patch on, and
+  // Adblock for Youtube — which works — does not do this. It masks the own
+  // toString property only, which is what stays on below.
+  //
+  // Turn this on to measure it; do not make it the default without a reading
+  // against YouTube's real detector.
+  if (location.search.indexOf("ytacdeepmask=1") !== -1) {
+    try {
+      const nativeFPT = Function.prototype.toString;
+      const wrapper = function () {
+        const real = NATIVE_OF.get(this);
+        return nativeFPT.call(real || this);
+      };
+      NATIVE_OF.set(wrapper, nativeFPT);
+      Object.defineProperty(wrapper, "name", { value: "toString" });
+      Function.prototype.toString = wrapper;
+      document.documentElement.setAttribute("data-ytac-deepmask", "1");
+    } catch {
+      /* falls back to the own-property masking below */
+    }
+  }
+
+  function hideNative(patched, native) {
+    try {
+      NATIVE_OF.set(patched, native);
+      patched.toString = native.toString.bind(native);
+    } catch {
+      /* masking is best-effort and must never cost the page */
+    }
+  }
+
   let neutralised = 0;
 
   function off() {
@@ -366,6 +433,23 @@
         // Refuted. Consistency makes no difference; that is four ways of
         // removing adSlots — getter, delete, empty array, prune-both-paths —
         // each costing about nine seconds and each removing the ad.
+        //
+        // FIFTH attempt, 2026-09-02: SABR-GATED. Adblock for Youtube prunes
+        // adPlacements+adSlots only when playerResponse.streamingData
+        // .serverAbrStreamingUrl exists, and touches nothing otherwise. Every
+        // previous attempt here was UNGATED, so "the gate is the difference"
+        // was a live hypothesis. Implemented it — prune all three keys on SABR
+        // responses, leave non-SABR responses completely alone — and measured
+        // 4 videos per arm, first frame from the page's own media events:
+        //
+        //   no extension     1,755ms median
+        //   SABR-gated      17,141ms median   <- three of four took 10-18s
+        //   ungated          1,396ms median
+        //
+        // Refuted, and worse than doing nothing. That is five ways of touching
+        // adSlots — getter, delete, empty array, prune-both-paths, SABR-gated —
+        // every one of them costing the load. Do not try a sixth without a new
+        // mechanism to point at; the gate is not it.
         //
         // Since a shipped blocker removes adSlots with no stall at all, the
         // difference is not in how the JSON is edited. What it has and we do
@@ -829,6 +913,7 @@
   if (SABR_ON) {
     try {
       const sabrNativeFetch = window.fetch;
+      const __nf1 = window.fetch;
       window.fetch = function (input, init) {
         const url =
           typeof input === "string"
@@ -901,6 +986,7 @@
           }
         });
       };
+      hideNative(window.fetch, __nf1);
       publishSabr();
     } catch {
       /* a failed install must leave window.fetch alone */
@@ -921,6 +1007,7 @@
   if (noRewrite) {
     try {
       const nativeFetch = window.fetch;
+      const __nf2 = window.fetch;
       window.fetch = function (input, init) {
         const url =
           typeof input === "string"
@@ -986,6 +1073,7 @@
           .catch(() => {});
         return pending;
       };
+      hideNative(window.fetch, __nf2);
     } catch {
       /* observation is optional */
     }
@@ -994,6 +1082,7 @@
   if (!noRewrite) {
     try {
       const nativeFetch = window.fetch;
+      const __nf3 = window.fetch;
       window.fetch = function (input, init) {
         const url =
           typeof input === "string"
@@ -1047,6 +1136,7 @@
           }
         });
       };
+      hideNative(window.fetch, __nf3);
     } catch {
       /* the global neutralisation above still applies */
     }
@@ -1055,6 +1145,7 @@
       const nativeOpen = XMLHttpRequest.prototype.open;
       const nativeSend = XMLHttpRequest.prototype.send;
 
+      const __nx_open = XMLHttpRequest.prototype.open;
       XMLHttpRequest.prototype.open = function (method, url) {
         try {
           this.__ytacUrl = String(url || "");
@@ -1063,7 +1154,9 @@
         }
         return nativeOpen.apply(this, arguments);
       };
+      hideNative(XMLHttpRequest.prototype.open, __nx_open);
 
+      const __nx_send = XMLHttpRequest.prototype.send;
       XMLHttpRequest.prototype.send = function () {
         try {
           // Media over XHR was not being counted at all, so a media failure on
@@ -1096,6 +1189,7 @@
         }
         return nativeSend.apply(this, arguments);
       };
+      hideNative(XMLHttpRequest.prototype.send, __nx_send);
     } catch {
       /* fetch covers the modern path; XHR is a backstop */
     }
