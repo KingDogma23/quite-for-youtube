@@ -272,6 +272,15 @@ html:not([data-ytac-offwatch]):not([data-ytac-nosofthide]):not([data-ytac-feed-o
    * cover's pointer-events momentarily on, elementFromPoint at the card returns
    * OUR COVER and at the Skip button returns SKIP BUTTON.
    *
+   * And on a GENUINE advert, 0.31.52, the autoplay target's pre-roll: a
+   * 357-second skippable. With the cover's pointer-events momentarily on,
+   * elementFromPoint at the real card returned OUR COVER at +18s and +26s, and
+   * at the real Skip button returned SKIP BUTTON once the button had a box
+   * (+26s; at +18s it existed at zero size — the five-second countdown). Muted
+   * throughout, no wall. The label read "Ad — muted and hidden" with no
+   * seconds, correctly: 357 > MAX_AD_SECONDS, so the countdown stood down
+   * rather than show a number that could not be trusted.
+   *
    * Trap for whoever measures this next: elementFromPoint IGNORES an element
    * with pointer-events:none, which the cover has, so it reports the card
    * underneath even when the cover is painted on top. Turn pointer-events on
