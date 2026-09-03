@@ -39,7 +39,7 @@
   // content script reports the NEW version while running the OLD logic — it
   // lies about exactly the thing CLAUDE.md's first gate exists to check, and
   // twice a result was reported from a build that was not running.
-  const VERSION = "0.31.34";
+  const VERSION = "0.31.36";
 
   /**
    * Orphan guard. The Facebook build has had this since 2.4.1; this one never
@@ -1392,12 +1392,6 @@
     // switches exist to say WHICH half does it — the feed hiding is the only
     // function of this extension that is not implicated in the wall, and it
     // should not be thrown away on a guess.
-    // On /watch the feed rules stand down entirely — see the header comment in
-    // content.css. This is an attribute rather than a media query because CSS
-    // cannot see the route, and it has to survive soft navigation, so tick()
-    // refreshes it.
-    if (location.pathname === "/watch") root.setAttribute("data-ytac-watch", "1");
-    else root.removeAttribute("data-ytac-watch");
 
     // The watch page's ad slots are hidden with opacity instead of display, so
     // offsetHeight and offsetParent still read normal. ON by default since
@@ -1423,16 +1417,6 @@
   function tick() {
     if (stopped) return;
     if (!contextAlive()) return shutdown();
-    // Soft navigation does not re-run applyCssToggles, and a stale
-    // data-ytac-watch would either leak the hiding onto a watch page (the wall)
-    // or suppress it on the home feed (silently doing nothing).
-    try {
-      const r = document.documentElement;
-      if (location.pathname === "/watch") r.setAttribute("data-ytac-watch", "1");
-      else r.removeAttribute("data-ytac-watch");
-    } catch {
-      /* reporting only */
-    }
     // The player loop must not run during a bypass either: it clicks, seeks
     // and changes playbackRate, none of which a control arm may do.
     if (!settings.enabled || location.search.indexOf("ytacoff=1") !== -1) return;

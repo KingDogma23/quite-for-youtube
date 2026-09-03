@@ -30,6 +30,9 @@ const EXT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = f => fs.readFileSync(path.join(EXT, f), 'utf8');
 const manifest = JSON.parse(read('manifest.json'));
 const css = read('content.css'), inject = read('inject.js'), popup = read('popup.js');
+// Comments mention the very selectors and properties these checks look for,
+// so every selector-level check runs against the stripped source.
+const cssCode = css.replace(/\/\*[\s\S]*?\*\//g, '');
 const content = read('content.js');
 
 const out = [];
@@ -50,7 +53,7 @@ const hidesBare = (sheet, sel) => {
   const re = new RegExp(`(^|[,\\s])${sel.replace(/[#.]/g, '\\$&')}\\s*(,|\\{)`, 'm');
   return re.test(sheet);
 };
-const bare = LOAD_BEARING.filter(sel => hidesBare(css, sel));
+const bare = LOAD_BEARING.filter(sel => hidesBare(cssCode, sel));
 check('css: nothing load-bearing is hidden outright', bare.length === 0,
       bare.length ? `hidden as itself: ${bare.join(', ')}` : 'none of the 9 playback-critical selectors');
 
@@ -62,22 +65,27 @@ check('CONTROL: hiding ytd-watch-flexy DOES trip that check — so it can fail',
 
 // The feed rules must stand down on the watch page. Measured 2026-09-03: with
 // them active there, YouTube walls the video before the player starts.
-const feedRules = (css.match(/html:not\(\[data-ytac-feed-off\]\)[^,{]*/g) || []);
-const unscoped = feedRules.filter(r => !r.includes(':not([data-ytac-watch])'));
-check('css: every feed rule stands down on the watch page',
-      feedRules.length > 0 && unscoped.length === 0,
-      `${feedRules.length} feed rules, ${unscoped.length} still active on /watch`);
-check('content: data-ytac-watch is refreshed on soft navigation',
-      (content.match(/data-ytac-watch/g) || []).length >= 3,
-      'a stale attribute either leaks the hiding onto /watch or kills it on the feed');
+// ONE HIDING METHOD. display:none on a YouTube ad container is detected
+// wherever it happens — on the FEED it sets the flag and the wall lands on the
+// next video clicked into, which is why every direct URL load reads clean.
+const AD_SELECTORS = /(ytd-ad-slot-renderer|ytd-in-feed-ad-layout-renderer|ytd-companion-slot-renderer|ytd-promoted-video-renderer|ytd-display-ad-renderer)/;
+const blocks = cssCode.split('}').filter(b => AD_SELECTORS.test(b));
+const hardBlocks = blocks.filter(b => /display:\s*none/.test(b));
+check('css: no ad-container rule uses display:none',
+      blocks.length > 0 && hardBlocks.length === 0,
+      `${blocks.length} ad-container blocks, ${hardBlocks.length} using display:none`);
+check('css: they hide by opacity instead',
+      blocks.some(b => /opacity:\s*0\s*!important/.test(b)),
+      'opacity keeps offsetHeight and offsetParent normal; display:none does not');
 
-// CONTROL. Unscope one rule and require the check to trip.
-const leaky = css.replace('html:not([data-ytac-feed-off]):not([data-ytac-watch])',
-                          'html:not([data-ytac-feed-off])');
-const leakyRules = (leaky.match(/html:not\(\[data-ytac-feed-off\]\)[^,{]*/g) || []);
-check('CONTROL: an unscoped feed rule DOES trip that check — so it can fail',
-      leakyRules.filter(r => !r.includes(':not([data-ytac-watch])')).length > 0,
-      'the 0.31.26 behaviour, which walled the video on a live measurement');
+// CONTROL. Put display:none back on an ad container and require the check to
+// trip.
+const hardCss = cssCode.replace('  opacity: 0 !important;\n  pointer-events: none !important;',
+                            '  display: none !important;');
+const regressedBlocks = hardCss.split('}').filter(b => AD_SELECTORS.test(b));
+check('CONTROL: display:none on an ad container DOES trip that check — so it can fail',
+      regressedBlocks.filter(b => /display:\s*none/.test(b)).length > 0,
+      'the 0.31.35 behaviour, which walled the video on an in-session click');
 
 check('css: hiding is the default, gated on an opt-OUT attribute',
       css.includes(':not([data-ytac-feed-off])'),
@@ -116,21 +124,9 @@ check('CONTROL: an opt-OUT rewrite DOES fail that check — so it can fail',
 // display:none on the watch page's ad slots walls the video before playback
 // starts; opacity:0 does not, measured on three videos. So the watch-page rules
 // must never use display, and must keep the box.
-const WATCH_RULE = /html\[data-ytac-watch\][\s\S]*?\{([\s\S]*?)\}/;
-const watchDecls = (WATCH_RULE.exec(css) || [, ''])[1];
-check('css: the watch-page rules hide by opacity, not display',
-      /opacity:\s*0\s*!important/.test(watchDecls) &&
-      !/display:\s*none/.test(watchDecls),
-      `watch-page declarations: ${watchDecls.trim().replace(/\s+/g, ' ')}`);
-check('css: the watch-page hiding is on by default (opt-OUT switch)',
-      css.includes(':not([data-ytac-nosofthide])'),
-      'shipping it opt-in would mean nothing is hidden on the watch page');
-
-// CONTROL. Swap opacity for display and require the check to trip.
-const hardHide = css.replace('opacity: 0 !important', 'display: none !important');
-check('CONTROL: display:none in the watch rules DOES trip that check — so it can fail',
-      /display:\s*none/.test((WATCH_RULE.exec(hardHide) || [, ''])[1]),
-      'the 0.31.26 behaviour, which walled the video on a live measurement');
+check('css: the hiding is on by default (opt-OUT switch)',
+      cssCode.includes(':not([data-ytac-nosofthide])'),
+      'shipping it opt-in would mean nothing is hidden anywhere');
 
 /* ---- 2b. the third measured trigger: the ad-skip loop ------------------ */
 
