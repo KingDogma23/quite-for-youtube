@@ -849,6 +849,10 @@
     // countdown only when the number is plausible for an advert; anything above
     // MAX_AD_SECONDS means duration is not measuring what this assumes, and a
     // wrong number is worse than no number.
+    //
+    // Verified on the page that produced the fault — the same 2h26m stream,
+    // video.duration 8772, ad condition set: the cover read "Ad — muted and
+    // hidden" with no seconds at all, where the previous build read "· 8725s".
     const raw = Number.isFinite(video.duration)
       ? Math.max(Math.ceil(video.duration - video.currentTime), 0)
       : null;
