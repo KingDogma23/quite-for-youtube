@@ -68,12 +68,17 @@ check('CONTROL: hiding ytd-watch-flexy DOES trip that check — so it can fail',
 // ONE HIDING METHOD. display:none on a YouTube ad container is detected
 // wherever it happens — on the FEED it sets the flag and the wall lands on the
 // next video clicked into, which is why every direct URL load reads clean.
-const AD_SELECTORS = /(ytd-ad-slot-renderer|ytd-in-feed-ad-layout-renderer|ytd-companion-slot-renderer|ytd-promoted-video-renderer|ytd-display-ad-renderer)/;
+const AD_SELECTORS = /(ytd-[a-z-]*ad[a-z-]*-renderer|ytd-promoted-[a-z-]+|ytd-companion-slot-renderer|ytm-companion-[a-z-]+|\.ytp-ad-[a-z-]+|ad-slot-renderer)/;
 const blocks = cssCode.split('}').filter(b => AD_SELECTORS.test(b));
 const hardBlocks = blocks.filter(b => /display:\s*none/.test(b));
 check('css: no ad-container rule uses display:none',
       blocks.length > 0 && hardBlocks.length === 0,
-      `${blocks.length} ad-container blocks, ${hardBlocks.length} using display:none`);
+      `${blocks.length} ad-container blocks, ${hardBlocks.length} using display:none` +
+      (hardBlocks.length ? ` -> ${hardBlocks[0].trim().split('\n')[0]}` : ''));
+check('test: the selector pattern covers .ytp-ad-* as well as ytd-*',
+      AD_SELECTORS.test('.ytp-ad-overlay-container') &&
+      AD_SELECTORS.test('ytd-ad-slot-renderer'),
+      'the first version listed only ytd-* and missed four overlay rules');
 check('css: they hide by opacity instead',
       blocks.some(b => /opacity:\s*0\s*!important/.test(b)),
       'opacity keeps offsetHeight and offsetParent normal; display:none does not');

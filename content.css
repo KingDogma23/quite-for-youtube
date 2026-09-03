@@ -146,15 +146,29 @@ html:not([data-ytac-feed-off]):not([data-ytac-nosofthide]) [data-ytac-hidden="1"
   pointer-events: none !important;
 }
 
-/* Overlay banners drawn on top of the video. */
+/* Overlay banners drawn on top of the video.
+ *
+ * opacity, like everything else. These were left on display:none when the rest
+ * were converted in 0.31.36, and the commit that converted them claimed "one
+ * hiding method everywhere" while these four contradicted it. They are ad
+ * containers on by default, and display:none on an ad container is the measured
+ * trigger — the fact that they only exist DURING an advert makes it untestable
+ * on demand, not safe. */
 html:not([data-ytac-overlay-off]) .ytp-ad-overlay-container,
 html:not([data-ytac-overlay-off]) .ytp-ad-overlay-slot,
 html:not([data-ytac-overlay-off]) .ytp-ad-text-overlay,
 html:not([data-ytac-overlay-off]) .ytp-ad-overlay-image {
-  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
-/* Merch and product shelves — opt-in, since some people want them. */
+/* Merch and product shelves — opt-in, since some people want them.
+ *
+ * These KEEP display:none, deliberately. A merch shelf is a product row, not an
+ * ad slot, so it is not in the category YouTube was measured to probe; it is
+ * off by default; and hiding it with opacity would leave a tall blank band in
+ * the description for a feature someone opted into. Revisit if a shelf is ever
+ * observed in a wall trigger. */
 html[data-ytac-merch-off] ytd-merch-shelf-renderer,
 html[data-ytac-merch-off] #description-inner > ytd-merch-shelf-renderer,
 html[data-ytac-merch-off] .ytd-watch-flexy > ytd-merch-shelf-renderer {
