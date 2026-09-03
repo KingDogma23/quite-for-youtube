@@ -478,6 +478,20 @@ const readsFields = [...new Set(
   (reportBlock.match(/\b(?:d|s|lt)\.[a-zA-Z]+/g) || []).map(m => m.split('.')[1]),
 )].filter(f => f !== 'join');
 const missingFromPreview = readsFields.filter(f => !preview.includes(f));
+// The preview is GENERATED from popup.html. If what is on disk is not what
+// the generator produces, someone edited the copy or popup.html moved on —
+// either way the preview no longer shows the product.
+const { buildPreview } = await import('./build-preview.mjs');
+const generated = buildPreview();
+check('preview: is exactly what build-preview.mjs generates from popup.html',
+      preview === generated,
+      preview === generated ? 'no drift' : 'DRIFT — run: node test/build-preview.mjs');
+// CONTROL. A one-word change in the preview must trip it.
+check('CONTROL: an edited preview DOES trip that check — so it can fail',
+      preview.replace('Ads silenced', 'Ads skipped') !== generated &&
+      preview.includes('Ads silenced'),
+      'the hand-maintained copy that drifted for hours');
+
 check('preview: stubs every field the report reads',
       readsFields.length > 0 && missingFromPreview.length === 0,
       missingFromPreview.length

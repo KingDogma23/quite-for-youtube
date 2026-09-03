@@ -1,0 +1,28 @@
+    <script>
+      window.chrome = {
+        storage: {
+          sync: { get: (d, cb) => cb({ ...d }), set: () => {} },
+          local: { set: () => {} },
+        },
+        tabs: { query: async () => [{ id: 1 }], sendMessage: async () => ({
+          version: "0.31.51", url: "/watch",
+          // The arm and validity signals the report opens with. A preview that
+          // omits them cannot show the two lines that exist to stop a bypassed
+          // or hidden-tab reading being mistaken for a live one.
+          bypassed: false, skipMode: "none", tabHidden: "0", hiddenNow: "0", hiddenEver: "0",
+          walled: false, switches: "none",
+          rewrites: 0, rewrote: "fetch=0,xhr=0,reel=0/0",
+          settings: { enabled: true, stripAdSchedule: true, skipVideoAds: true,
+                      hideFeedAds: true, hideOverlays: true, hideMerch: false, badge: false },
+          lifetime: { adsBlocked: 1284, leaked: 9, secondsSaved: 9420,
+                      adsSkipped: 601, adsPlayedThrough: 47 },
+          session: { videoAdsSkipped: 0, videoAdsSeeked: 0, spedUp: 0,
+                     videoAdsPlayedThrough: 3, falseSeeksReverted: 0,
+                     overlaysClosed: 0, adSightings: [], firstAdSeen: null,
+                     lastAction: "ad played through (skipping off — it triggers the wall)" },
+          stripper: { adSchedulesStripped: 3, lastKeysStripped: "adPlacements,playerAds" },
+          page: { playerFound: true, adPlayingNow: false, skipButtonVisible: false,
+                  feedAds: { inDom: 3, stillVisible: 0 } },
+        }) },
+      };
+    </script>
