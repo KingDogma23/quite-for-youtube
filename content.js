@@ -1333,6 +1333,10 @@
    * value so each can be an arm: ?ytacskip=click, =speed, =seek, comma-joined,
    * or =1 / =all for the old behaviour.
    *
+   * Parser verified live on 0.31.51 by reading data-ytac-skipmode: =bogus
+   * publishes "none", =1 publishes "click,speed,seek", =seek,click publishes
+   * "seek,click". An unknown value enables nothing.
+   *
    * Gates verified on fixtures, 0.31.50, live page, synthetic ad condition:
    *
    *   click   a fake Skip with a listener was pressed once (isTrusted false);
