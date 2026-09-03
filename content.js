@@ -1075,6 +1075,10 @@
 
   // ---------------------------------------------------------------- helpers
 
+  // On feed pages this resolves to YouTube's inline hover-preview player, not
+  // a watch player — observed 2026-09-03 on /feed/subscriptions. It carries no
+  // ad-showing, so nothing below acts on it; if a preview ever did, the cover
+  // would attach to the preview. Recorded as an observation, not a fault.
   const player = () => document.querySelector(".html5-video-player");
 
   function adIsPlaying() {
