@@ -140,6 +140,31 @@ check('css: the hiding is on by default (opt-OUT switch)',
       cssCode.includes(':not([data-ytac-nosofthide])'),
       'shipping it opt-in would mean nothing is hidden anywhere');
 
+/* ---- 2a2. no wrapper on window.fetch by default -------------------------- */
+
+// With the rewrite off, the fetch OBSERVER was the only wrapper still on
+// window.fetch, and it was fully fingerprintable — name "", length 2, toString
+// non-native. It feeds diagnostics and nothing else. Measurement goes behind a
+// switch; the default leaves fetch pristine.
+const injectCode = stripJs(inject);
+check('inject: the fetch observer is opt-IN (?ytacobserve=1)',
+      /const OBSERVE_ON = location\.search\.indexOf\("ytacobserve=1"\) !== -1/.test(injectCode) &&
+      /if \(noRewrite && OBSERVE_ON\)/.test(injectCode),
+      'a detectable wrapper that removes no advert has no business being on by default');
+check('inject: hideNative preserves name and length, not only toString',
+      /defineProperty\(patched, "name"/.test(injectCode) &&
+      /defineProperty\(patched, "length"/.test(injectCode),
+      'two of the three tells were never masked at all');
+check('inject: the observe arm announces itself on the switches line',
+      /"ytacobserve=1"\) !== -1 \? "observe"/.test(injectCode),
+      'an arm that does not report itself reads like the default');
+
+// CONTROL. Make the observer unconditional again and require the check to trip.
+const alwaysObserve = injectCode.replace('if (noRewrite && OBSERVE_ON)', 'if (noRewrite)');
+check('CONTROL: an unconditional observer DOES trip that check — so it can fail',
+      alwaysObserve !== injectCode && !/if \(noRewrite && OBSERVE_ON\)/.test(alwaysObserve),
+      'the 0.31.42 behaviour: a fingerprintable fetch on every load');
+
 /* ---- 2b. the third measured trigger: the ad-skip loop ------------------ */
 
 // Bisected 2026-09-03 against clean baselines: with inject.js off AND every

@@ -162,6 +162,7 @@
       [
         q.indexOf("ytacoff=1") !== -1 ? "off" : "",
         NO_REWRITE ? "norewrite" : "",
+        location.search.indexOf("ytacobserve=1") !== -1 ? "observe" : "",
         q.indexOf("ytacnoinject=1") !== -1 ? "noinject" : "",
         q.indexOf("ytacprune=1") !== -1 ? "prune" : "",
         q.indexOf("ytacslots=") !== -1 ? "slots" : "",
@@ -250,6 +251,12 @@
     try {
       NATIVE_OF.set(patched, native);
       patched.toString = native.toString.bind(native);
+      // name and length were never masked, and both are tells on their own:
+      // measured 2026-09-03, our fetch wrapper read name "" and length 2
+      // against the native "fetch" and 1. A wrapper written as
+      // `function (input, init)` has length 2 whatever it wraps.
+      Object.defineProperty(patched, "name", { value: native.name, configurable: true });
+      Object.defineProperty(patched, "length", { value: native.length, configurable: true });
     } catch {
       /* masking is best-effort and must never cost the page */
     }
@@ -1161,7 +1168,24 @@
    * cannot see the suspected cause is not a control; it is a second
    * uncontrolled session. This reads the body of a CLONE and modifies nothing.
    */
-  if (noRewrite) {
+  // OFF BY DEFAULT since 0.31.43, behind ?ytacobserve=1.
+  //
+  // With the rewrite off this was the ONLY wrapper still installed, and it is
+  // fully fingerprintable: measured live, window.fetch read name "", length 2,
+  // and Function.prototype.toString.call() non-native, against a pristine
+  // "fetch" / 1 / native with the extension bypassed. It exists to feed the
+  // hops trace — it removes no advert and hides nothing. Every wall trigger
+  // found today was something YouTube could see; this is something YouTube
+  // can see, for a measurement benefit only. Measurements go behind switches.
+  //
+  // Verified live on 0.31.43: default load, fetch reads "fetch" / 1 / native
+  // and the switches line carries no "observe"; with ?ytacobserve=1 the wrapper
+  // is present, name and length still match native, fetch.toString() reads
+  // native, and data-ytac-media publishes. Function.prototype.toString.call()
+  // still tells — the deep mask is off deliberately, see hideNative — which is
+  // why the observer is an arm and not a default.
+  const OBSERVE_ON = location.search.indexOf("ytacobserve=1") !== -1;
+  if (noRewrite && OBSERVE_ON) {
     try {
       const nativeFetch = window.fetch;
       const __nf2 = window.fetch;

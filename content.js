@@ -39,7 +39,7 @@
   // content script reports the NEW version while running the OLD logic — it
   // lies about exactly the thing CLAUDE.md's first gate exists to check, and
   // twice a result was reported from a build that was not running.
-  const VERSION = "0.31.42";
+  const VERSION = "0.31.43";
 
   /**
    * Orphan guard. The Facebook build has had this since 2.4.1; this one never
