@@ -1,24 +1,29 @@
 # Quite for YouTube
 
-A Chrome extension that removes ads from YouTube.
+A Chrome extension that quiets ads on YouTube.
 
 | | |
 | --- | --- |
-| **Video ads** | Skip is clicked as soon as it appears; unskippable ads are fast-forwarded |
+| **Video ads** | Muted and covered while they run, so you neither see nor hear them |
 | **Feed & search ads** | Homepage, sidebar, search results, masthead banner |
 | **Player overlays** | Banners drawn on top of the video |
 | **Merch shelves** | Product shelves under videos (optional, off by default) |
 
-On most videos no ad is ever queued for the player. On the rest the ad plays
-and is skipped instead — removing those outright stops the video from starting
-at all, so it isn't attempted. No requests are blocked and nothing is delayed.
+The advert still plays, and that is deliberate. Removing it, skipping it, or
+seeking past it all stop the video from starting at all, so none of those is
+attempted — the trade is a video that works. While the advert runs it is
+silenced and covered, and the wait is the cost. No requests are blocked and
+nothing is delayed.
+
+Skipping and fast-forwarding remain in the code behind a switch, off by
+default, for measurement.
 
 **Running two ad blockers is worse than running one.** Any network-level
 blocker will trigger the same wall, and with both installed you cannot tell
 which caused what.
 
-**YouTube changes its player regularly**, and when it does, skipping can break
-until the extension is updated. Expected, not a regression.
+**YouTube changes its player regularly**, and when it does, the muting and
+covering can break until the extension is updated. Expected, not a regression.
 
 ## If it stops working
 
@@ -43,11 +48,12 @@ it can currently see in the player, with a **Copy report** button.
 
 ### Verified against real ads
 
-The video path is not theoretical. On a live account it handled 37 ads in one
-session — 35 skipped via the button, 2 fast-forwarded where no Skip existed,
-2 seeked as a last resort, and **zero false seeks**, meaning the guard that
-protects your own video never misfired. Everything it relies on was confirmed
-against captured markup from those ads rather than assumed.
+The video path is not theoretical. On a live account, adverts were detected,
+silenced and covered while they played, counted, and released cleanly the
+moment they ended — with the video still playing throughout and **zero false
+seeks**, meaning the guard that protects your own video never misfired.
+Everything it relies on was confirmed against captured markup from real adverts
+rather than assumed.
 
 ### Tests
 

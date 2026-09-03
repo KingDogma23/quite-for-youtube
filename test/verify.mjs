@@ -337,6 +337,30 @@ check('CONTROL: stale copy DOES trip that check — so it can fail',
       STALE_CLAIMS.some(c => stalePopup.includes(c)),
       'the 0.31.39 copy, which described a feature that had been disabled');
 
+/* ---- 2f. what we TELL people must match what the build does ------------- */
+
+// The popup, the store description and the README all promised skipping after
+// it had been switched off. The store description is the worst of the three:
+// it is the sentence someone reads before installing.
+const readme = read('README.md');
+const PROMISES_SKIPPING = /skips video ads|Skip is clicked|fast-forwards unskippable/i;
+check('manifest: the store description does not promise skipping',
+      !PROMISES_SKIPPING.test(manifest.description),
+      `description: "${manifest.description}"`);
+check('manifest: the description fits the store limit',
+      manifest.description.length <= 132,
+      `${manifest.description.length} chars, limit 132`);
+check('readme: does not promise skipping either',
+      !PROMISES_SKIPPING.test(readme),
+      'the README is the second thing people read');
+
+// CONTROL. Put the old sentence back and require the checks to trip.
+check('CONTROL: the old description DOES trip that check — so it can fail',
+      PROMISES_SKIPPING.test(
+        'Removes YouTube ads: skips video ads, and hides feed, sidebar, search and Shorts ad panels.',
+      ),
+      'the wording shipped until 0.31.41');
+
 /* ---- 3. the build can be identified, and the arm is stated ------------- */
 
 const lit = /const VERSION = "([^"]+)"/.exec(content);
