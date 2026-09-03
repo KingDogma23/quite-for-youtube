@@ -952,6 +952,18 @@
    * trace, no wall, no console errors, cover and mute released, rate 1 — and a
    * genuine advert on one hop, credited once as played through (counter 1,
    * sightings 3) and released. The click path, under load, with a real one.
+   *
+   * And the autoplay boundary, 0.31.52, default mode: seeking a 715s upload to
+   * its last six seconds brought a real two-advert pod at the end (counter
+   * 1 -> 2, covered and muted throughout, no wall), then YouTube's own
+   * autoplay hopped (hops 1 -> 2) with cover and mute released and rate 1,
+   * and the next video's pre-roll was counted (-> 3) and released. Three
+   * genuine adverts across the one soft navigation the extension does not
+   * initiate, each credited once, no console errors.
+   *
+   * Instrument note: a raw video.currentTime write near the end of a
+   * stream-replay VOD is snapped back by YouTube's own resume logic, and so is
+   * movie_player.seekTo() on that kind of video. Use a normal upload.
    */
   let adPendingCredit = false;
   function creditPlayedThrough() {
