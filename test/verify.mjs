@@ -283,6 +283,60 @@ check('CONTROL: a seek inside quietAd DOES trip that check — so it can fail',
       /currentTime\s*=/.test(seekBody),
       'seeking is one of the four measured wall triggers');
 
+/* ---- 2d. the popup preview must not drift from the popup ---------------- */
+
+// test/popup-preview.html renders the popup without the extension. It had gone
+// stale: it still declared version "0.7.0" and stubbed none of the fields added
+// since, so the preview showed a report no user has ever seen — and could not
+// have caught a regression in the lines it omitted.
+const preview = read('test/popup-preview.html');
+const reportBlock = (/lastReport = \[[\s\S]*?\.join\("\\n"\)/.exec(popup) || [''])[0];
+const readsFields = [...new Set(
+  (reportBlock.match(/\b(?:d|s|lt)\.[a-zA-Z]+/g) || []).map(m => m.split('.')[1]),
+)].filter(f => f !== 'join');
+const missingFromPreview = readsFields.filter(f => !preview.includes(f));
+check('preview: stubs every field the report reads',
+      readsFields.length > 0 && missingFromPreview.length === 0,
+      missingFromPreview.length
+        ? `missing: ${missingFromPreview.join(', ')}`
+        : `${readsFields.length} fields, all stubbed`);
+const series = manifest.version.split('.').slice(0, 2).join('.');
+const previewVersion = (/version: "([\d.]+)"/.exec(preview) || [, ''])[1];
+check('preview: is from this version series, not a museum piece',
+      previewVersion.startsWith(series + '.'),
+      `preview declares ${previewVersion || '(none)'}, product is ${manifest.version}`);
+
+// CONTROL. Drop a field from the preview and require the check to trip.
+const previewDrifted = preview.replace('videoAdsPlayedThrough', 'xxxDrifted');
+check('CONTROL: a field missing from the preview DOES trip that check — so it can fail',
+      readsFields.filter(f => !previewDrifted.includes(f)).length > 0,
+      'fixture drift is now a build failure, not something someone has to notice');
+
+/* ---- 2e. the popup must describe what the build actually does ----------- */
+
+// Every one of these described behaviour that was switched off today. A popup
+// that promises skipping while the code is built not to skip is the same
+// defect as a check that reads its own documentation.
+const popupHtml = read('popup.html');
+const STALE_CLAIMS = [
+  'Ads skipped as they appear',
+  'Clicks Skip, fast-forwards unskippable ones',
+];
+const stale = STALE_CLAIMS.filter(c => popupHtml.includes(c) || popup.includes(c));
+check('popup: no copy promising the skipping this build disables',
+      stale.length === 0,
+      stale.length ? `still claims: ${stale.join(' | ')}` : 'copy matches behaviour');
+check('popup: the headline stat is one that actually moves',
+      /sClean[\s\S]{0,60}adsPlayedThrough/.test(popup),
+      '"Time saved" was the headline and is permanently 0 with skipping off');
+
+// CONTROL. Put a stale claim back and require the check to trip.
+const stalePopup = popupHtml.replace('Ads muted and hidden as they appear',
+                                     'Ads skipped as they appear');
+check('CONTROL: stale copy DOES trip that check — so it can fail',
+      STALE_CLAIMS.some(c => stalePopup.includes(c)),
+      'the 0.31.39 copy, which described a feature that had been disabled');
+
 /* ---- 3. the build can be identified, and the arm is stated ------------- */
 
 const lit = /const VERSION = "([^"]+)"/.exec(content);

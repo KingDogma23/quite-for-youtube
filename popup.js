@@ -60,20 +60,21 @@ function render(d, stored) {
   const on = $("enabled").checked;
   $("stateText").textContent = on ? "Protection on" : "Protection off";
   $("stateSub").textContent = on
-    ? "Ads skipped as they appear"
+    ? "Ads muted and hidden as they appear"
     : "YouTube is showing you everything";
 
   // Totals first, from whichever source has them: they are all-time figures and
   // do not depend on which tab is open.
-  const lt = d?.lifetime || stored || { adsBlocked: 0, secondsSaved: 0, adsSkipped: 0 };
+  const lt = d?.lifetime ||
+    stored || { adsBlocked: 0, secondsSaved: 0, adsSkipped: 0, adsPlayedThrough: 0 };
   // "Videos protected" was removed from the headline on 2026-08-29. It counted
   // videos where a rewrite fired and no ad appeared, which a control run showed
   // is dominated by videos that carried no ad in the first place: five videos
   // with the rewrite DISABLED produced zero ads. adsBlocked and leaked are still
   // recorded and still appear in the diagnostics report, where their confound
   // can be stated; they are not a number to put in front of a user as a result.
-  $("sTime").textContent = humanTime(lt.secondsSaved);
-  $("sClean").textContent = compact(lt.adsSkipped || 0);
+  $("sClean").textContent = compact(lt.adsPlayedThrough || 0);
+  $("sTime").textContent = compact(lt.adsSkipped || 0);
 
   if (!d) {
     $("ver").textContent = "";
