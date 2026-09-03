@@ -39,7 +39,7 @@
   // content script reports the NEW version while running the OLD logic — it
   // lies about exactly the thing CLAUDE.md's first gate exists to check, and
   // twice a result was reported from a build that was not running.
-  const VERSION = "0.31.50";
+  const VERSION = "0.31.51";
 
   /**
    * Orphan guard. The Facebook build has had this since 2.4.1; this one never
@@ -925,6 +925,23 @@
     restoreMute();
   }
 
+  /**
+   * Credit an advert that ran to its end with no action taken on it. One
+   * place, because three paths need it: the default (no mode) path credits at
+   * first sight; an action mode credits at the GAP, when the advert has gone
+   * without an action landing; and a pod credits the finished advert when the
+   * next one begins, because a pod has no gap.
+   */
+  let adPendingCredit = false;
+  function creditPlayedThrough() {
+    if (adCredited) return;
+    adCredited = true;
+    session.videoAdsPlayedThrough++;
+    lifetime.adsPlayedThrough = (lifetime.adsPlayedThrough || 0) + 1;
+    lifetimeDirty = true;
+    publishPlayedThrough();
+  }
+
   function publishPlayedThrough() {
     try {
       document.documentElement.setAttribute(
@@ -1386,8 +1403,14 @@
       // and the pair was credited once. A second advert inside a pod is now
       // detected by the media being replaced — see newAdStarted() below —
       // rather than by a gap that does not exist.
-      if (!adGoneSince) adGoneSince = Date.now();
-      else if (Date.now() - adGoneSince > AD_GAP_MS) adCredited = false;
+      if (!adGoneSince) {
+        adGoneSince = Date.now();
+        // An advert ran under an action mode and no action landed on it — an
+        // unskippable in click mode, say. It reached playback and was watched
+        // through; it is counted, or the arm's own readout undercounts.
+        if (adPendingCredit) creditPlayedThrough();
+        adPendingCredit = false;
+      } else if (Date.now() - adGoneSince > AD_GAP_MS) adCredited = false;
       lastAdCt = 0;
       unquietAd();
       return;
@@ -1397,7 +1420,11 @@
     const p = player();
 
     // Re-open crediting when the pod moves to its next advert.
-    if (newAdStarted(p && p.querySelector("video"))) adCredited = false;
+    if (newAdStarted(p && p.querySelector("video"))) {
+      if (adPendingCredit) creditPlayedThrough();
+      adPendingCredit = false;
+      adCredited = false;
+    }
 
     // COUNT FIRST, ACT SECOND. 0.31.25 gated the whole function on SKIP_ON, so
     // with skipping off the extension stopped counting the adverts it could
@@ -1411,13 +1438,7 @@
       // extension taking credit for an advert the viewer sat through.
       quietAd(p, p.querySelector("video"));
       vid.adSeen = true;
-      if (!adCredited) {
-        adCredited = true;
-        session.videoAdsPlayedThrough++;
-        lifetime.adsPlayedThrough = (lifetime.adsPlayedThrough || 0) + 1;
-        lifetimeDirty = true;
-        publishPlayedThrough();
-      }
+      creditPlayedThrough();
       session.lastAction = "ad played through (skipping off — it triggers the wall)";
       return;
     }
@@ -1427,6 +1448,8 @@
     // running, and it is muted and covered exactly as it would be with no
     // action allowed at all.
     quietAd(p, p.querySelector("video"));
+    vid.adSeen = true;
+    if (!adCredited) adPendingCredit = true;
 
     const skip = p.querySelector(SKIP_BUTTONS);
     if (CLICK_ON && isVisible(skip)) {

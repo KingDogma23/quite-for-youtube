@@ -226,6 +226,20 @@ const skipOptIn = /const SKIP_ON = SKIP_MODE\.size > 0;/.test(contentCode) &&
                   /if \(!m\) return new Set\(\);/.test(contentCode);
 check('content: ad skip/seek is OFF by default (?ytacskip=<mode> opts in)',
       skipOptIn, 'measured: loop alone => wall, after the video had started playing');
+// Under an action mode, an advert that no action lands on — an unskippable in
+// click mode — must still be counted as played through, or the arm's own
+// readout undercounts. It is settled at the gap, and for a pod when the next
+// advert begins.
+check('content: an advert under an action mode is credited at the gap if no action landed',
+      /if \(adPendingCredit\) creditPlayedThrough\(\);/.test(contentCode) &&
+      /if \(!adCredited\) adPendingCredit = true;/.test(contentCode) &&
+      (contentCode.match(/creditPlayedThrough\(\)/g) || []).length >= 4,
+      'default path, gap path and pod path all share one credit');
+const noPending = contentCode.replace('if (!adCredited) adPendingCredit = true;', '');
+check('CONTROL: dropping the pending mark DOES trip that check — so it can fail',
+      noPending !== contentCode && !/if \(!adCredited\) adPendingCredit = true;/.test(noPending),
+      'the 0.31.50 behaviour: unskippables uncounted under click mode');
+
 // The gate must NOT sit at the top of the function. 0.31.25 put it there and
 // the extension stopped counting adverts it could see — a live report said
 // "video ads reaching playback: 0" while carrying 3 ad sightings.
@@ -244,7 +258,8 @@ check('content: the mode parser only admits click, speed, seek',
       /x === "click" \|\| x === "speed" \|\| x === "seek"/.test(contentCode),
       'an unknown mode must enable nothing');
 check('content: the advert is still covered and muted while an action is allowed',
-      /quietAd\(p, p\.querySelector\("video"\)\);\s*\n\s*const skip = p\.querySelector\(SKIP_BUTTONS\);/.test(contentCode),
+      /quietAd\(p, p\.querySelector\("video"\)\);[\s\S]{0,160}?const skip = p\.querySelector\(SKIP_BUTTONS\);/.test(contentCode) &&
+      !/const skip = p\.querySelector\(SKIP_BUTTONS\);[\s\S]*?quietAd\(p, p\.querySelector\("video"\)\)/.test(bodyOf(contentCode, 'handleVideoAd')),
       'Skip takes five seconds to appear and unskippables never offer one');
 check('content: the skip mode is published on the page and in the payload',
       /data-ytac-skipmode/.test(contentCode) && /skipMode:/.test(contentCode) && /skip actions allowed/.test(popup),
@@ -312,17 +327,17 @@ check('CONTROL: removing the skip gate DOES fail that check — so it can fail',
 // 2026-09-03, while the comment claimed pods were counted.
 check('content: a second advert in a pod re-opens crediting',
       /function newAdStarted\(/.test(contentCode) &&
-      /if \(newAdStarted\([\s\S]{0,60}\) adCredited = false;/.test(contentCode),
+      /if \(newAdStarted\([\s\S]{0,60}\)\) \{[\s\S]{0,160}?adCredited = false;/.test(contentCode),
       'the gap reset cannot fire inside a pod — there is no gap');
 check('content: the playhead is forgotten when the break ends',
       /lastAdCt = 0;/.test(contentCode),
       'else the first advert of the next break looks like a continuation');
 
 // CONTROL. Remove the pod detection and require the check to trip.
-const noPod = contentCode.replace(/if \(newAdStarted\([\s\S]*?\)\) adCredited = false;/, '');
+const noPod = contentCode.replace(/if \(newAdStarted\([\s\S]*?\)\) \{[\s\S]*?adCredited = false;\s*\}/, '');
 check('CONTROL: dropping pod detection DOES trip that check — so it can fail',
       noPod !== contentCode &&
-      !/if \(newAdStarted\([\s\S]{0,60}\) adCredited = false;/.test(noPod),
+      !/if \(newAdStarted\([\s\S]{0,60}\)\) \{[\s\S]{0,160}?adCredited = false;/.test(noPod),
       'the 0.31.41 behaviour: two adverts counted as one');
 
 /* ---- 2b2. the sighting probe can see a Shorts advert -------------------- */
