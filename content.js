@@ -39,7 +39,7 @@
   // content script reports the NEW version while running the OLD logic — it
   // lies about exactly the thing CLAUDE.md's first gate exists to check, and
   // twice a result was reported from a build that was not running.
-  const VERSION = "0.31.30";
+  const VERSION = "0.31.32";
 
   /**
    * Orphan guard. The Facebook build has had this since 2.4.1; this one never
@@ -1313,6 +1313,15 @@
     // refreshes it.
     if (location.pathname === "/watch") root.setAttribute("data-ytac-watch", "1");
     else root.removeAttribute("data-ytac-watch");
+
+    // The watch page's ad slots are hidden with opacity instead of display, so
+    // offsetHeight and offsetParent still read normal. ON by default since
+    // 0.31.32, measured on three videos; ?ytacnosofthide=1 turns it off.
+    if (location.search.indexOf("ytacnosofthide=1") !== -1) {
+      root.setAttribute("data-ytac-nosofthide", "1");
+    } else {
+      root.removeAttribute("data-ytac-nosofthide");
+    }
 
     const noFeed = location.search.indexOf("ytacnofeed=1") !== -1;
     const noOverlay = location.search.indexOf("ytacnooverlay=1") !== -1;

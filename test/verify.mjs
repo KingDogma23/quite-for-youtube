@@ -111,6 +111,27 @@ check('CONTROL: an opt-OUT rewrite DOES fail that check — so it can fail',
       !/indexOf\("ytacrewrite=1"\)\s*===\s*-1/.test(walledRewrite),
       'the 0.31.22 default, which walled the video on a live measurement');
 
+/* ---- 2a. the watch page hides ads by OPACITY, never by display ---------- */
+
+// display:none on the watch page's ad slots walls the video before playback
+// starts; opacity:0 does not, measured on three videos. So the watch-page rules
+// must never use display, and must keep the box.
+const WATCH_RULE = /html\[data-ytac-watch\][\s\S]*?\{([\s\S]*?)\}/;
+const watchDecls = (WATCH_RULE.exec(css) || [, ''])[1];
+check('css: the watch-page rules hide by opacity, not display',
+      /opacity:\s*0\s*!important/.test(watchDecls) &&
+      !/display:\s*none/.test(watchDecls),
+      `watch-page declarations: ${watchDecls.trim().replace(/\s+/g, ' ')}`);
+check('css: the watch-page hiding is on by default (opt-OUT switch)',
+      css.includes(':not([data-ytac-nosofthide])'),
+      'shipping it opt-in would mean nothing is hidden on the watch page');
+
+// CONTROL. Swap opacity for display and require the check to trip.
+const hardHide = css.replace('opacity: 0 !important', 'display: none !important');
+check('CONTROL: display:none in the watch rules DOES trip that check — so it can fail',
+      /display:\s*none/.test((WATCH_RULE.exec(hardHide) || [, ''])[1]),
+      'the 0.31.26 behaviour, which walled the video on a live measurement');
+
 /* ---- 2b. the third measured trigger: the ad-skip loop ------------------ */
 
 // Bisected 2026-09-03 against clean baselines: with inject.js off AND every

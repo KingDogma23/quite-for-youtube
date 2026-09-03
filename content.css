@@ -149,3 +149,42 @@ html[data-ytac-merch-off] .ytd-watch-flexy > ytd-merch-shelf-renderer {
 #ytac-badge[data-state="ok"] {
   background: #0f7b3f;
 }
+
+/* ---------------------------------------------------------------------------
+ * SOFT HIDE — ?ytacsofthide=1, an experiment, OFF by default.
+ *
+ * The feed rules stand down on /watch because display:none on YouTube's own ad
+ * containers walls the video before the player starts (measured 2026-09-03).
+ * The likely mechanism is a bait check: the standard one reads offsetHeight and
+ * offsetParent, and display:none zeroes the first and nulls the second.
+ *
+ * opacity:0 does neither. The element keeps its box, its height and its
+ * offsetParent, so a check of that shape sees a normal element — while nothing
+ * is drawn. The advert still occupies its space, which is the cost, and it is
+ * a smaller cost than not hiding it at all.
+ *
+ * MEASURED 2026-09-03 and now the DEFAULT. ?ytacnosofthide=1 turns it off.
+ * Three videos from the subscriptions feed, extension active, window in front,
+ * each after a clean bypassed baseline:
+ *
+ *     Gy5JtnURrTY   2 ad elements, opacity 0, boxes 168px   no wall, rs 4
+ *     MGxcosNuC8k   2 ad elements hidden, boxes intact      no wall, rs 4
+ *     0ZqgE_V9JOk   2 ad elements hidden, boxes intact      no wall, rs 4
+ *
+ * The first of those carried a REAL sidebar advert — 168px of served content,
+ * not an empty container — so the case that matters was covered rather than
+ * inferred from empty slots.
+ *
+ * display:none in that same position walls the video before playback starts.
+ * opacity:0 does not. The cost is the advert's space: a blank box stays where
+ * it was. That is the same trade the Instagram build settled on — keep the box,
+ * hide the contents — and for the same reason, that changing a container's
+ * height is what breaks the page around it.
+ * ------------------------------------------------------------------------- */
+html[data-ytac-watch]:not([data-ytac-nosofthide]):not([data-ytac-feed-off]) ytd-ad-slot-renderer,
+html[data-ytac-watch]:not([data-ytac-nosofthide]):not([data-ytac-feed-off]) ytd-in-feed-ad-layout-renderer,
+html[data-ytac-watch]:not([data-ytac-nosofthide]):not([data-ytac-feed-off]) ytd-companion-slot-renderer,
+html[data-ytac-watch]:not([data-ytac-nosofthide]):not([data-ytac-feed-off]) ytd-player-legacy-desktop-watch-ads-renderer {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
