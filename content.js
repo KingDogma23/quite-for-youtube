@@ -1377,6 +1377,13 @@
    * Skip, and the wall followed. A programmatic press — isTrusted:false — is
    * detected. Speed and seek remain unmeasured; the flag they would need a
    * clean baseline for was set by this arm.
+   *
+   * THE CONTRAST, same evening, 0.31.52: a TRUSTED press on YouTube's own
+   * Skip — a real pointer event, through the cover, at z 1000 above it —
+   * during a genuine 357-second advert at 71s in. The advert ended at once
+   * (media back to the 1006s video), the cover and mute released, the count
+   * unchanged, and no wall at +10s. A viewer can skip. The extension cannot.
+   * That is the whole of it, and it is why the cover leaves Skip on top.
    */
   const SKIP_MODE = (() => {
     const m = /[?&]ytacskip=([a-z0-9,]+)/i.exec(location.search);
