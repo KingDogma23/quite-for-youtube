@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Quite for YouTube\u2122 \u2014 YouTube ad blocker, Shorts and feed cleaner",
   "short_name": "Quite for YouTube\u2122",
-  "version": "0.31.37",
+  "version": "0.31.38",
   "description": "Removes YouTube ads: skips video ads, and hides feed, sidebar, search and Shorts ad panels. No accounts, no tracking.",
   "permissions": [
     "storage"

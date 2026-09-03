@@ -215,6 +215,33 @@ check('content: quiet mode never touches currentTime or playbackRate',
       !/currentTime\s*=|playbackRate\s*=/.test(
         (/function quietAd\([\s\S]*?\n  \}/.exec(content) || [''])[0]),
       'seeking and fast-forwarding are both measured wall triggers');
+// The cover and the mute are applied by the loop. EVERY path that stops the
+// loop must release them, or the viewer is left with a black panel over their
+// own video and no sound until they reload.
+// Confine the search to the shutdown BODY. The first version matched
+// [\s\S]*? across the whole file, so it found a call in a different function
+// and reported the invariant held after the real one had been removed.
+const bodyOf = (src, name) => {
+  const at = src.indexOf(`function ${name}(`);
+  if (at === -1) return '';
+  const open = src.indexOf('{', at);
+  const close = src.indexOf('\n  }', open);
+  return close === -1 ? '' : src.slice(open, close);
+};
+const shutdownBody = bodyOf(content, 'shutdown');
+check('content: shutdown() releases the cover and the mute',
+      /unquietAd\(\)/.test(shutdownBody),
+      'reloading the extension mid-advert strands the cover otherwise');
+check('content: disabling Protection mid-advert releases them too',
+      /if \(!settings\.enabled \|\| location\.search[\s\S]{0,80}\{\s*\n\s*unquietAd\(\);/.test(content),
+      'a black screen sends people to the off switch; it must not make it stick');
+
+// CONTROL. Take the release back out of shutdown and require the check to fail.
+const stranded = content.replace(/    try \{\n      unquietAd\(\);\n    \} catch \{\n      \/\* nothing left to clean up with \*\/\n    \}\n/, '');
+check('CONTROL: a shutdown without release DOES fail that check — so it can fail',
+      stranded !== content && !/unquietAd\(\)/.test(bodyOf(stranded, 'shutdown')),
+      'the 0.31.37 behaviour: cover and mute stranded on teardown');
+
 check('content: the cover countdown is bounded by MAX_AD_SECONDS',
       /raw <= MAX_AD_SECONDS \? raw : null/.test(content),
       'a live stream made the first version read "8725s"');

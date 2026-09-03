@@ -39,7 +39,7 @@
   // content script reports the NEW version while running the OLD logic — it
   // lies about exactly the thing CLAUDE.md's first gate exists to check, and
   // twice a result was reported from a build that was not running.
-  const VERSION = "0.31.37";
+  const VERSION = "0.31.38";
 
   /**
    * Orphan guard. The Facebook build has had this since 2.4.1; this one never
@@ -77,6 +77,17 @@
       badgeEl = null;
     } catch {
       /* the page is not ours to break on the way out */
+    }
+    // The advert cover and the mute are applied BY the loop, so stopping the
+    // loop without releasing them strands a black panel over the viewer's own
+    // video with the sound off, until the page is reloaded. That is the worst
+    // state this file can leave behind, and reloading the extension mid-advert
+    // reaches it — the content script is orphaned and shutdown() is the only
+    // thing that runs.
+    try {
+      unquietAd();
+    } catch {
+      /* nothing left to clean up with */
     }
   }
 
@@ -1429,7 +1440,15 @@
     if (!contextAlive()) return shutdown();
     // The player loop must not run during a bypass either: it clicks, seeks
     // and changes playbackRate, none of which a control arm may do.
-    if (!settings.enabled || location.search.indexOf("ytacoff=1") !== -1) return;
+    //
+    // But release the cover and the mute FIRST. Turning Protection off during
+    // an advert used to return here with the cover still up and the sound
+    // still off, permanently — and a black screen is exactly what sends
+    // someone to the off switch, so the off switch made it stick.
+    if (!settings.enabled || location.search.indexOf("ytacoff=1") !== -1) {
+      unquietAd();
+      return;
+    }
     try {
       creditStoppedSchedules();
       if (!adIsPlaying()) seekAttempts = 0; // ad break over; restore the budget
