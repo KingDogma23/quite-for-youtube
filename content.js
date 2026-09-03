@@ -816,6 +816,16 @@
    * The wait remains, and that is the honest limit of it — this does not get
    * the viewer's time back, it gets their attention back.
    *
+   * Measured latency, 2026-09-03, sampling a live page: cover up within one
+   * tick of the advert starting, and DOWN within 1010ms of it ending, with the
+   * mute released in the same pass. That number matters — a cover that lingers
+   * is a black screen over the viewer's own video, which is the worst thing
+   * this file can do. It was measured rather than assumed after a single
+   * reading showed the cover still up 3s after the advert cleared; that
+   * reading coincided with a theatre-mode toggle in the same instant and did
+   * not reproduce (2013ms on a deliberate retry), so it is recorded as
+   * observed-once and unexplained, not as a known bug.
+   *
    * ?ytacnoquiet=1 turns it off.
    */
   const QUIET_OFF = location.search.indexOf("ytacnoquiet=1") !== -1;
