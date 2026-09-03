@@ -120,6 +120,7 @@ function render(d, stored) {
     `ad payloads neutralised: cold-load ${d.rewrites ?? 0}, ${d.rewrote ?? "fetch=0,xhr=0"}`,
     `  (a clicked video uses the fetch path, where cold-load 0 is normal)`,
     `diagnostic switches in force: ${d.switches ?? "unknown"}`,
+    `skip actions allowed: ${d.skipMode ?? "none"}   (click / speed / seek; each is an arm, none is the default)`,
     `video ads reaching playback: ${reached} ` +
       `(${s.videoAdsSkipped} skipped, ${s.spedUp ?? 0} sped up, ` +
       `${s.videoAdsSeeked} seeked, ${s.videoAdsPlayedThrough ?? 0} played through)`,

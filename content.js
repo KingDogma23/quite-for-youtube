@@ -39,7 +39,7 @@
   // content script reports the NEW version while running the OLD logic — it
   // lies about exactly the thing CLAUDE.md's first gate exists to check, and
   // twice a result was reported from a build that was not running.
-  const VERSION = "0.31.48";
+  const VERSION = "0.31.50";
 
   /**
    * Orphan guard. The Facebook build has had this since 2.4.1; this one never
@@ -1276,7 +1276,41 @@
    * ~60 versions aimed at the response and network path never touched the part
    * that actually trips it. ?ytacskip=1 turns it back on for measurement.
    */
-  const SKIP_ON = location.search.indexOf("ytacskip=1") !== -1;
+  /**
+   * ?ytacskip=<mode> — which of the loop's three actions may run. OFF unless
+   * asked. The loop as a whole was measured to wall the video on 2026-09-03,
+   * but the loop does three different things, and which of them is the
+   * trigger was never isolated:
+   *
+   *   click   press YouTube's own Skip button when it is visible
+   *   speed   playbackRate 16 through an unskippable advert
+   *   seek    jump to the end as a last resort
+   *
+   * A human presses Skip all day and it is one event; speed and seek are
+   * timeline manipulations. That is a reason to expect click to survive and
+   * the other two not to — and a reason, not a measurement. Each has its own
+   * value so each can be an arm: ?ytacskip=click, =speed, =seek, comma-joined,
+   * or =1 / =all for the old behaviour.
+   */
+  const SKIP_MODE = (() => {
+    const m = /[?&]ytacskip=([a-z0-9,]+)/i.exec(location.search);
+    if (!m) return new Set();
+    const v = m[1].toLowerCase();
+    if (v === "1" || v === "all") return new Set(["click", "speed", "seek"]);
+    return new Set(v.split(",").filter((x) => x === "click" || x === "speed" || x === "seek"));
+  })();
+  const CLICK_ON = SKIP_MODE.has("click");
+  const SPEED_ON = SKIP_MODE.has("speed");
+  const SEEK_ON = SKIP_MODE.has("seek");
+  const SKIP_ON = SKIP_MODE.size > 0;
+  try {
+    document.documentElement.setAttribute(
+      "data-ytac-skipmode",
+      SKIP_ON ? [...SKIP_MODE].join(",") : "none",
+    );
+  } catch {
+    /* reporting only */
+  }
 
   /**
    * ?ytacoff=1, read ONCE.
@@ -1364,8 +1398,14 @@
       return;
     }
 
+    // An action may be allowed, but until it lands — Skip takes five seconds
+    // to appear, an unskippable advert never offers one — the advert is still
+    // running, and it is muted and covered exactly as it would be with no
+    // action allowed at all.
+    quietAd(p, p.querySelector("video"));
+
     const skip = p.querySelector(SKIP_BUTTONS);
-    if (isVisible(skip)) {
+    if (CLICK_ON && isVisible(skip)) {
       const v = p.querySelector("video");
       // Seconds actually avoided: what was left of the ad when Skip was hit.
       const remaining =
@@ -1398,7 +1438,7 @@
     // Fast-forward FIRST. If the detection is wrong, the viewer sees their own
     // video briefly play fast — annoying and instantly recoverable. Seeking is
     // held back as the last resort precisely because getting it wrong is not.
-    if (video.playbackRate < 8) {
+    if (SPEED_ON && video.playbackRate < 8) {
       video.playbackRate = 16;
       if (!mutedByUs) {
         priorMuted = video.muted;
@@ -1410,6 +1450,8 @@
       session.lastAction = "fast-forwarding through ad";
       return;
     }
+
+    if (!SEEK_ON) return;
 
     // Already sent to the end and the ad has not cleared: seeking again every
     // tick would achieve nothing and spin the counters, so stop.
@@ -1702,6 +1744,7 @@
         // so a reading taken in one is VOID, not merely odd.
         bypassed:
           document.documentElement.getAttribute("data-ytac-bypassed") === "1",
+        skipMode: document.documentElement.getAttribute("data-ytac-skipmode") || "none",
         tabHidden: document.documentElement.getAttribute("data-ytac-hidden"),
         settings: { ...settings },
         session: { ...session },

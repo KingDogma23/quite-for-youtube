@@ -168,11 +168,11 @@
           local: { set: () => {} },
         },
         tabs: { query: async () => [{ id: 1 }], sendMessage: async () => ({
-          version: "0.31.48", url: "/watch",
+          version: "0.31.50", url: "/watch",
           // The arm and validity signals the report opens with. A preview that
           // omits them cannot show the two lines that exist to stop a bypassed
           // or hidden-tab reading being mistaken for a live one.
-          bypassed: false, tabHidden: "0", hiddenNow: "0", hiddenEver: "0",
+          bypassed: false, skipMode: "none", tabHidden: "0", hiddenNow: "0", hiddenEver: "0",
           walled: false, switches: "none",
           rewrites: 0, rewrote: "fetch=0,xhr=0,reel=0/0",
           settings: { enabled: true, stripAdSchedule: true, skipVideoAds: true,

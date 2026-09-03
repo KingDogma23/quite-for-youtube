@@ -248,7 +248,35 @@ html:not([data-ytac-offwatch]):not([data-ytac-nosofthide]):not([data-ytac-feed-o
 #ytac-ad-cover {
   position: absolute;
   inset: 0;
-  z-index: 30;
+  /* 900, from measuring YouTube's own layers on 2026-09-03:
+   *
+   *     ytp-ad-skip-button / -container        1000   must stay ABOVE us
+   *     ytp-ad-preview-container ("Skip in 5")  1000   stays above, useful
+   *     ytp-ad-player-overlay-layout__
+   *       player-card-container                 850   the advertiser's card:
+   *                                                   avatar, headline, CTA
+   *     ytp-chrome-bottom (control bar)          59   covered during the advert
+   *     ytp-ad-persistent-progress-bar           38   covered
+   *
+   * At the previous 30 the video frame was covered but the card at 850 drew on
+   * top of the panel — a real session reported "just see 3 ads, and a skip
+   * button". Covering the control bar for the advert's duration is the trade:
+   * it cannot seek during an advert anyway, and Skip is the control that
+   * matters, which 900 leaves visible.
+   *
+   * Verified on 0.31.49 the same evening. A real 167-second advert ran with
+   * the cover up, countdown exact (114s at 54s in), muted, Skip present, and
+   * released cleanly at the end. Paint order proven on a fixture built from
+   * the advert's own ancestor chain (video-ads > ytp-ad-player-overlay-layout
+   * > the card, none of which opens a stacking context above 850): with the
+   * cover's pointer-events momentarily on, elementFromPoint at the card returns
+   * OUR COVER and at the Skip button returns SKIP BUTTON.
+   *
+   * Trap for whoever measures this next: elementFromPoint IGNORES an element
+   * with pointer-events:none, which the cover has, so it reports the card
+   * underneath even when the cover is painted on top. Turn pointer-events on
+   * for the probe, then off again. */
+  z-index: 900;
   display: flex;
   align-items: center;
   justify-content: center;

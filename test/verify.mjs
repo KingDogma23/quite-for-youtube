@@ -222,8 +222,9 @@ check('CONTROL: a live URL read in the loop gate DOES trip that check — so it 
 // CSS gate set, the player loop still walls the video on its own. So the skip
 // and the seek are opt-IN, and gated on a URL switch rather than on
 // settings.skipVideoAds, which a stored profile value could flip back on.
-const skipOptIn = /const SKIP_ON = location\.search\.indexOf\("ytacskip=1"\) !== -1/.test(content);
-check('content: ad skip/seek is OFF by default (?ytacskip=1 opts in)',
+const skipOptIn = /const SKIP_ON = SKIP_MODE\.size > 0;/.test(contentCode) &&
+                  /if \(!m\) return new Set\(\);/.test(contentCode);
+check('content: ad skip/seek is OFF by default (?ytacskip=<mode> opts in)',
       skipOptIn, 'measured: loop alone => wall, after the video had started playing');
 // The gate must NOT sit at the top of the function. 0.31.25 put it there and
 // the extension stopped counting adverts it could see — a live report said
@@ -231,6 +232,30 @@ check('content: ad skip/seek is OFF by default (?ytacskip=1 opts in)',
 check('content: an unskipped ad is still COUNTED (recordAd before the gate returns)',
       /if \(!SKIP_ON\) \{[\s\S]{0,400}?recordAd\(/.test(content),
       'a feature that cannot count what it saw cannot report the trade it is making');
+// The loop's three actions are gated SEPARATELY, so each can be measured as
+// its own arm. The loop as a whole walled; which action did was never
+// isolated, and a single switch cannot isolate anything.
+check('content: click, speed and seek each have their own gate',
+      /if \(CLICK_ON && isVisible\(skip\)\)/.test(contentCode) &&
+      /if \(SPEED_ON && video\.playbackRate < 8\)/.test(contentCode) &&
+      /if \(!SEEK_ON\) return;/.test(contentCode),
+      'one switch for three actions cannot say which one walls');
+check('content: the mode parser only admits click, speed, seek',
+      /x === "click" \|\| x === "speed" \|\| x === "seek"/.test(contentCode),
+      'an unknown mode must enable nothing');
+check('content: the advert is still covered and muted while an action is allowed',
+      /quietAd\(p, p\.querySelector\("video"\)\);\s*\n\s*const skip = p\.querySelector\(SKIP_BUTTONS\);/.test(contentCode),
+      'Skip takes five seconds to appear and unskippables never offer one');
+check('content: the skip mode is published on the page and in the payload',
+      /data-ytac-skipmode/.test(contentCode) && /skipMode:/.test(contentCode) && /skip actions allowed/.test(popup),
+      'an arm that does not announce itself reads like the default');
+
+// CONTROL. Collapse two gates into one and require the check to trip.
+const oneGate = contentCode.replace('if (SPEED_ON && video.playbackRate < 8)', 'if (SKIP_ON && video.playbackRate < 8)');
+check('CONTROL: a shared gate DOES trip that check — so it can fail',
+      oneGate !== contentCode && !/if \(SPEED_ON && video\.playbackRate < 8\)/.test(oneGate),
+      'the 0.31.49 shape: one switch, three actions');
+
 check('content: the SKIP_ON gate is not the first test in handleVideoAd',
       !/function handleVideoAd\(\) \{\s*if \(!SKIP_ON/.test(content),
       'gating the whole function disables the counting with the skipping');
@@ -272,8 +297,8 @@ check('CONTROL: the old skipped+seeked line DOES fail that check — so it can f
       'the line that reported 0 while three ads had been seen');
 
 check('content: the skip ACTION is gated, not the whole function',
-      /if \(!SKIP_ON\) \{/.test(content) &&
-      /const SKIP_ON = location\.search/.test(content),
+      /if \(!SKIP_ON\) \{/.test(contentCode) &&
+      /const SKIP_ON = SKIP_MODE\.size > 0;/.test(contentCode),
       'a stored setting must not re-enable the action, but detection must survive');
 
 // CONTROL. Remove the gate and require both checks to fail.
@@ -351,10 +376,24 @@ check('CONTROL: the trigger placed AFTER the gate DOES trip that check — so it
 check('content: the ad cover is an element we add, not a YouTube node hidden',
       /createElement\("div"\)[\s\S]{0,200}ytac-ad-cover/.test(content),
       'nothing of YouTube\'s may be hidden, resized or removed');
+const coverDecls = (/#ytac-ad-cover\s*\{([\s\S]*?)\}/.exec(cssCode) || [, ''])[1];
+const coverZ = parseInt((/z-index:\s*(\d+)/.exec(coverDecls) || [, '0'])[1], 10);
 check('css: the cover styles target our own id only',
-      /#ytac-ad-cover/.test(css) &&
-      !/ytd-[a-z-]+[^{]*\{[^}]*z-index:\s*30/.test(css),
+      /#ytac-ad-cover/.test(cssCode) &&
+      !/ytd-[a-z-]+[^{]*\{[^}]*z-index:\s*\d+/.test(cssCode),
       'a rule against their element would be a bait-check target');
+// Measured 2026-09-03: the advertiser card container is z 850, the Skip
+// button 1000. Below 850 the card draws on top of the panel; at or above 1000
+// the viewer loses the Skip button.
+check('css: the cover sits above the advert card (850) and below Skip (1000)',
+      coverZ > 850 && coverZ < 1000,
+      `cover z-index ${coverZ}`);
+// CONTROL. Put it back to 30 and require the check to trip.
+const lowCover = cssCode.replace(/(#ytac-ad-cover\s*\{[\s\S]*?z-index:\s*)\d+/, '$130');
+const lowZ = parseInt((/z-index:\s*(\d+)/.exec((/#ytac-ad-cover\s*\{([\s\S]*?)\}/.exec(lowCover) || [, ''])[1]) || [, '0'])[1], 10);
+check('CONTROL: a cover at 30 DOES trip that check — so it can fail',
+      lowCover !== cssCode && !(lowZ > 850 && lowZ < 1000),
+      'the 0.31.48 layer, under the advertiser card');
 check('content: quiet mode never touches currentTime or playbackRate',
       !/function quietAd\([\s\S]*?\n  \}/.test(content) ||
       !/currentTime\s*=|playbackRate\s*=/.test(
