@@ -41,6 +41,17 @@ const stripJs = (src) =>
   src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 const content = read('content.js');
 const contentCode = stripJs(content);
+// The body of one top-level function, so a check can be confined to it. A
+// check that searched [\s\S]*? across the whole file once found a call in a
+// different function and reported an invariant held after the real one had
+// been removed.
+const bodyOf = (src, name) => {
+  const at = src.indexOf(`function ${name}(`);
+  if (at === -1) return '';
+  const open = src.indexOf('{', at);
+  const close = src.indexOf('\n  }', open);
+  return close === -1 ? '' : src.slice(open, close);
+};
 
 const out = [];
 const check = (name, pass, detail) => out.push({ name, pass: !!pass, detail });
@@ -289,6 +300,50 @@ check('CONTROL: dropping pod detection DOES trip that check — so it can fail',
       !/if \(newAdStarted\([\s\S]{0,60}\) adCredited = false;/.test(noPod),
       'the 0.31.41 behaviour: two adverts counted as one');
 
+/* ---- 2b2. the sighting probe can see a Shorts advert -------------------- */
+
+// A Shorts advert is an ad slot inside the reel, not a ytp-ad* element in the
+// player, so the probe could not record one at all. Whether ad-showing lands on
+// the player for it is the reading that decides if the cover fires on Shorts,
+// and nothing had captured it.
+const observeBody = bodyOf(contentCode, 'observePlayer');
+const reelTriggerAt = observeBody.indexOf('activeReelAdSlot()');
+const classGateAt = observeBody.indexOf('cls === lastPlayerClasses');
+check('content: a Shorts ad slot in the active reel records a sighting',
+      /function activeReelAdSlot\(/.test(contentCode) && reelTriggerAt !== -1,
+      'without this the Shorts question is unmeasurable even in real use');
+check('content: the Shorts trigger runs BEFORE the player class-change gate',
+      reelTriggerAt !== -1 && classGateAt !== -1 && reelTriggerAt < classGateAt,
+      'after the gate it only runs when the player classes change — which a Shorts advert may never do');
+check('content: the sighting records surface and adSlotInActiveReel',
+      /surface: location\.pathname\.startsWith\("\/shorts\/"\)/.test(contentCode) &&
+      /adSlotInActiveReel: !!activeReelAdSlot\(\)/.test(contentCode),
+      'adStateClass alone cannot say which surface it came from');
+check('content: sightings are readable from the page, and stamped 0 at start',
+      /data-ytac-sightings/.test(contentCode) &&
+      /setAttribute\("data-ytac-sightings", "0"\)/.test(contentCode) &&
+      /data-ytac-lastsighting/.test(contentCode),
+      'absent must mean "never ran", not "no sighting yet"');
+
+check('popup: flags a Shorts advert that got no ad-showing',
+      /SHORTS ADVERT WITHOUT ad-showing/.test(popup),
+      'the reading that matters must be loud in the report, not buried');
+
+// CONTROL. Drop the Shorts trigger and require the check to trip.
+const noShorts = contentCode.replace('const reelSlot = activeReelAdSlot();', 'const reelSlot = null;');
+check('CONTROL: dropping the Shorts trigger DOES trip that check — so it can fail',
+      noShorts !== contentCode && bodyOf(noShorts, 'observePlayer').indexOf('activeReelAdSlot()') === -1,
+      'the 0.31.45 probe, blind to Shorts adverts');
+// CONTROL for the ordering: move the trigger below the gate and require a trip.
+const afterGate = (() => {
+  const body = bodyOf(contentCode, 'observePlayer');
+  const trig = body.slice(body.indexOf('const reelSlot'), body.indexOf('const cls ='));
+  return contentCode.replace(trig, '').replace('lastPlayerClasses = cls;', 'lastPlayerClasses = cls;\n' + trig);
+})();
+check('CONTROL: the trigger placed AFTER the gate DOES trip that check — so it can fail',
+      afterGate !== contentCode && (() => { const b = bodyOf(afterGate, 'observePlayer'); return b.indexOf('activeReelAdSlot()') > b.indexOf('cls === lastPlayerClasses'); })(),
+      'the 0.31.47 placement, which the positive control caught');
+
 /* ---- 2c. quiet ads: cover and mute, never remove ------------------------ */
 
 // The cover must be OUR node laid on top, never a rule against a YouTube
@@ -308,16 +363,6 @@ check('content: quiet mode never touches currentTime or playbackRate',
 // The cover and the mute are applied by the loop. EVERY path that stops the
 // loop must release them, or the viewer is left with a black panel over their
 // own video and no sound until they reload.
-// Confine the search to the shutdown BODY. The first version matched
-// [\s\S]*? across the whole file, so it found a call in a different function
-// and reported the invariant held after the real one had been removed.
-const bodyOf = (src, name) => {
-  const at = src.indexOf(`function ${name}(`);
-  if (at === -1) return '';
-  const open = src.indexOf('{', at);
-  const close = src.indexOf('\n  }', open);
-  return close === -1 ? '' : src.slice(open, close);
-};
 const shutdownBody = bodyOf(content, 'shutdown');
 check('content: shutdown() releases the cover and the mute',
       /unquietAd\(\)/.test(shutdownBody),

@@ -39,7 +39,7 @@
   // content script reports the NEW version while running the OLD logic — it
   // lies about exactly the thing CLAUDE.md's first gate exists to check, and
   // twice a result was reported from a build that was not running.
-  const VERSION = "0.31.45";
+  const VERSION = "0.31.48";
 
   /**
    * Orphan guard. The Facebook build has had this since 2.4.1; this one never
@@ -1119,6 +1119,26 @@
    * finite duration, and moving the playhead there ends it.
    */
   /** Record what an ad actually looks like, once per session. */
+  /**
+   * The Shorts reel on screen, if it carries an advert slot. Diagnostics only.
+   * The stylesheet already hides that slot by opacity; what nobody has seen is
+   * whether the player ALSO gets ad-showing for it, which is what would make
+   * the cover and the mute fire. This lets a sighting be recorded either way.
+   */
+  function activeReelAdSlot() {
+    if (!location.pathname.startsWith("/shorts/")) return null;
+    const mid = window.innerHeight / 2;
+    for (const reel of document.querySelectorAll("ytd-reel-video-renderer")) {
+      const r = reel.getBoundingClientRect();
+      if (r.height > 0 && r.top < mid && r.bottom > mid) {
+        return reel.querySelector(
+          "ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer, ytd-promoted-video-renderer",
+        );
+      }
+    }
+    return null;
+  }
+
   function captureAdShape(p) {
     // Keep the most recent few rather than only the first: a single spurious
     // sighting must not lock out the real one.
@@ -1147,9 +1167,30 @@
           ? Math.round(video.duration * 10) / 10
           : "unknown",
       adStateClass: p.matches(AD_PLAYING),
+      // Which surface, and whether the ACTIVE reel carries an ad slot. On a
+      // Shorts advert the answer to "did ad-showing land on the player" is the
+      // one that decides whether the cover and mute fire there. Never observed
+      // with the window in front on 2026-09-03; this line exists so the next
+      // Shorts session produces the reading instead of a guess.
+      surface: location.pathname.startsWith("/shorts/") ? "shorts" : "watch",
+      adSlotInActiveReel: !!activeReelAdSlot(),
     };
     session.adSightings.push(shape);
     session.firstAdSeen = session.adSightings[0];
+    // Readable from the page, like data-ytac-adsplayed: the count, and the
+    // two facts the Shorts question turns on. Without this a sighting could
+    // only be read by copying the popup report by hand.
+    try {
+      const r = document.documentElement;
+      r.setAttribute("data-ytac-sightings", String(session.adSightings.length));
+      r.setAttribute(
+        "data-ytac-lastsighting",
+        `${shape.surface}:${shape.adStateClass ? "ad-showing" : "no-ad-showing"}:` +
+          `${shape.adSlotInActiveReel ? "reel-slot" : "no-reel-slot"}`,
+      );
+    } catch {
+      /* reporting only */
+    }
   }
 
   /**
@@ -1163,9 +1204,32 @@
    */
   let lastPlayerClasses = "";
 
+  // The reel slot most recently recorded, so a Shorts advert is captured once
+  // as it arrives rather than on every tick it stays on screen.
+  let lastReelSlot = null;
+
   function observePlayer() {
     const p = player();
     if (!p) return;
+
+    // BEFORE the class-change gate below, deliberately. That gate makes the
+    // rest of this function run only when the player's classes change — and
+    // a Shorts advert may never touch the player's classes at all, which is
+    // the very case this trigger exists to record. 0.31.47 placed it after
+    // the gate; the positive control (a slot injected into the active reel,
+    // sightings stayed 0) caught it. The diagnostic had been given the
+    // detector's single point of failure, again.
+    //
+    // Verified on 0.31.48: plain Short, sightings 0; slot injected into the
+    // active reel, sightings 1 reading shorts:no-ad-showing:reel-slot with no
+    // cover and no mute; three seconds later still 1, so the dedupe holds.
+    const reelSlot = activeReelAdSlot();
+    if (reelSlot && reelSlot !== lastReelSlot) {
+      lastReelSlot = reelSlot;
+      return captureAdShape(p);
+    }
+    if (!reelSlot) lastReelSlot = null;
+
     const cls = p.className || "";
     if (cls === lastPlayerClasses) return;
     lastPlayerClasses = cls;
@@ -1549,8 +1613,13 @@
   function start() {
     console.log(`[YT Ad Cleaner ${VERSION}] active on ${location.pathname}`);
     applyCssToggles();
-    // Stamp the counter at zero so "no advert yet" cannot read as "never ran".
+    // Stamp the counters at zero so "no advert yet" cannot read as "never ran".
     publishPlayedThrough();
+    try {
+      document.documentElement.setAttribute("data-ytac-sightings", "0");
+    } catch {
+      /* reporting only */
+    }
 
     // ?ytacnoloop=1 — the player loop stands down, the stylesheet and the
     // page-world script stay on. Third of the three bisect switches.

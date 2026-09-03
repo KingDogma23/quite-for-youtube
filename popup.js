@@ -138,7 +138,11 @@ function render(d, stored) {
       ? `first ad seen:\n  ad classes: ${s.firstAdSeen.adClassesFound.join(" ") || "(none)"}\n` +
         `  markers matched: ${s.firstAdSeen.markerMatched.join(" ") || "(NONE)"}\n` +
         `  skip matched: ${s.firstAdSeen.skipMatched.join(" ") || "(none)"}\n` +
-        `  duration: ${s.firstAdSeen.videoDuration}  adStateClass: ${s.firstAdSeen.adStateClass}`
+        `  duration: ${s.firstAdSeen.videoDuration}  adStateClass: ${s.firstAdSeen.adStateClass}\n` +
+        `  surface: ${s.firstAdSeen.surface ?? "watch"}  ad slot in active reel: ${s.firstAdSeen.adSlotInActiveReel ?? false}` +
+        (s.firstAdSeen.surface === "shorts" && !s.firstAdSeen.adStateClass
+          ? "\n  ** SHORTS ADVERT WITHOUT ad-showing — the cover and mute did NOT fire. Report this. **"
+          : "")
       : `first ad seen: none yet`,
   ]
     .filter((line) => line !== null)
