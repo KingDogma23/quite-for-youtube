@@ -60,6 +60,25 @@ check('CONTROL: hiding ytd-watch-flexy DOES trip that check — so it can fail',
       LOAD_BEARING.filter(s => hidesBare(sabotagedCss, s)).length > 0,
       'over-broad selector detected in the sabotaged copy');
 
+// The feed rules must stand down on the watch page. Measured 2026-09-03: with
+// them active there, YouTube walls the video before the player starts.
+const feedRules = (css.match(/html:not\(\[data-ytac-feed-off\]\)[^,{]*/g) || []);
+const unscoped = feedRules.filter(r => !r.includes(':not([data-ytac-watch])'));
+check('css: every feed rule stands down on the watch page',
+      feedRules.length > 0 && unscoped.length === 0,
+      `${feedRules.length} feed rules, ${unscoped.length} still active on /watch`);
+check('content: data-ytac-watch is refreshed on soft navigation',
+      (content.match(/data-ytac-watch/g) || []).length >= 3,
+      'a stale attribute either leaks the hiding onto /watch or kills it on the feed');
+
+// CONTROL. Unscope one rule and require the check to trip.
+const leaky = css.replace('html:not([data-ytac-feed-off]):not([data-ytac-watch])',
+                          'html:not([data-ytac-feed-off])');
+const leakyRules = (leaky.match(/html:not\(\[data-ytac-feed-off\]\)[^,{]*/g) || []);
+check('CONTROL: an unscoped feed rule DOES trip that check — so it can fail',
+      leakyRules.filter(r => !r.includes(':not([data-ytac-watch])')).length > 0,
+      'the 0.31.26 behaviour, which walled the video on a live measurement');
+
 check('css: hiding is the default, gated on an opt-OUT attribute',
       css.includes(':not([data-ytac-feed-off])'),
       'rules apply before any script runs, so slots never paint');
@@ -91,6 +110,25 @@ check('CONTROL: an opt-OUT rewrite DOES fail that check — so it can fail',
       walledRewrite !== inject &&
       !/indexOf\("ytacrewrite=1"\)\s*===\s*-1/.test(walledRewrite),
       'the 0.31.22 default, which walled the video on a live measurement');
+
+/* ---- 2b. the third measured trigger: the ad-skip loop ------------------ */
+
+// Bisected 2026-09-03 against clean baselines: with inject.js off AND every
+// CSS gate set, the player loop still walls the video on its own. So the skip
+// and the seek are opt-IN, and gated on a URL switch rather than on
+// settings.skipVideoAds, which a stored profile value could flip back on.
+const skipOptIn = /const SKIP_ON = location\.search\.indexOf\("ytacskip=1"\) !== -1/.test(content);
+check('content: ad skip/seek is OFF by default (?ytacskip=1 opts in)',
+      skipOptIn, 'measured: loop alone => wall, after the video had started playing');
+check('content: the gate is checked before settings.skipVideoAds',
+      /if \(!SKIP_ON \|\| !settings\.skipVideoAds/.test(content),
+      'a stored setting must not be able to re-enable it');
+
+// CONTROL. Remove the gate and require both checks to fail.
+const unskipped = content.replace('!SKIP_ON || !settings.skipVideoAds', '!settings.skipVideoAds');
+check('CONTROL: removing the skip gate DOES fail that check — so it can fail',
+      unskipped !== content && !/if \(!SKIP_ON \|\| !settings\.skipVideoAds/.test(unskipped),
+      'the 0.31.24 behaviour, which walled the video on a live measurement');
 
 /* ---- 3. the build can be identified, and the arm is stated ------------- */
 

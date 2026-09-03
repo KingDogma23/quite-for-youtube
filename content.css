@@ -1,4 +1,22 @@
 /*
+ * WHY THE FEED RULES STAND DOWN ON THE WATCH PAGE (:not([data-ytac-watch]))
+ *
+ * Measured live on 2026-09-03, each arm against a clean baseline confirmed
+ * immediately before it:
+ *
+ *   overlay rules OFF, feed rules ON   WALL, readyState 0, no media events
+ *   whole stylesheet OFF               NO wall, readyState 4, video plays
+ *
+ * These rules also matched the watch page's own sidebar and companion ad
+ * slots, so YouTube found its ad containers hidden on the very page it was
+ * about to play, and walled it before the player ever started. Off the watch
+ * page — home, search, subscriptions — nothing is looking, and the hiding is
+ * the one function of this extension not implicated in the wall.
+ *
+ * content.js sets data-ytac-watch on /watch and clears it elsewhere.
+ */
+
+/*
  * Static hiding for YouTube's ad containers.
  *
  * Selectors are derived from the live EasyList and uBlock Origin filter lists
@@ -16,9 +34,9 @@
  */
 
 /* --- the container, so no empty gap is left behind (EasyList's approach) --- */
-html:not([data-ytac-feed-off]) ytd-rich-item-renderer:has(> #content > ytd-ad-slot-renderer),
-html:not([data-ytac-feed-off]) #contents > ytd-rich-item-renderer:has(> ytd-ad-slot-renderer),
-html:not([data-ytac-feed-off]) ytd-rich-section-renderer:has(ytd-ad-slot-renderer),
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-rich-item-renderer:has(> #content > ytd-ad-slot-renderer),
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) #contents > ytd-rich-item-renderer:has(> ytd-ad-slot-renderer),
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-rich-section-renderer:has(ytd-ad-slot-renderer),
 /* Guarded with :not(:has(... > *:not(ytd-ad-slot-renderer))) — hide the section
    only when it contains NOTHING but ad slots.
    Measured on live YouTube 2026-08-29: the watch-page sidebar puts all related
@@ -27,55 +45,55 @@ html:not([data-ytac-feed-off]) ytd-rich-section-renderer:has(ytd-ad-slot-rendere
    and hid 24 real videos with it — the "videos list on the right disappears on
    some videos" fault. The ad itself is still caught by the bare
    ytd-ad-slot-renderer backstop below, so the guard costs a gap at worst. */
-html:not([data-ytac-feed-off]) ytd-item-section-renderer:has(> #contents > ytd-ad-slot-renderer):not(:has(> #contents > *:not(ytd-ad-slot-renderer))),
-html:not([data-ytac-feed-off]) #shorts-inner-container > .ytd-shorts:has(> .ytd-reel-video-renderer > ytd-ad-slot-renderer),
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-item-section-renderer:has(> #contents > ytd-ad-slot-renderer):not(:has(> #contents > *:not(ytd-ad-slot-renderer))),
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) #shorts-inner-container > .ytd-shorts:has(> .ytd-reel-video-renderer > ytd-ad-slot-renderer),
 
 /* --- watch-page sidebar and companion slots, parent included so the
        surrounding item does not leave a gap --- */
-html:not([data-ytac-feed-off]) ytd-watch-next-secondary-results-renderer ytd-ad-slot-renderer,
-html:not([data-ytac-feed-off]) #related ytd-ad-slot-renderer,
-html:not([data-ytac-feed-off]) #panels ytd-ad-slot-renderer,
-html:not([data-ytac-feed-off]) ytd-engagement-panel-section-list-renderer:has(ytd-ad-slot-renderer),
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-watch-next-secondary-results-renderer ytd-ad-slot-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) #related ytd-ad-slot-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) #panels ytd-ad-slot-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-engagement-panel-section-list-renderer:has(ytd-ad-slot-renderer),
 /* The ads engagement panel names itself, and holds no ad-slot-renderer, so
    the :has() rule above never matched it. Seen rendering as a Sponsored
    block UNDER the player at narrow widths, where the sidebar collapses
    into the main column. Matching on target-id is safe: the other panels
    carry their own ids (comments-section, structured-description,
    clip-create) and none of them are ads. */
-html:not([data-ytac-feed-off]) ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"],
-html:not([data-ytac-feed-off]) ytd-ads-engagement-panel-content-renderer,
-html:not([data-ytac-feed-off]) ytd-compact-video-renderer:has(ytd-ad-slot-renderer),
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"],
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-ads-engagement-panel-content-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-compact-video-renderer:has(ytd-ad-slot-renderer),
 
 /* --- the ad element itself, as a backstop --- */
-html:not([data-ytac-feed-off]) ytd-ad-slot-renderer,
-html:not([data-ytac-feed-off]) ad-slot-renderer,
-html:not([data-ytac-feed-off]) ytm-companion-slot[data-content-type] > ytm-companion-ad-renderer,
-html:not([data-ytac-feed-off]) ytd-search-pyv-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-ad-slot-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ad-slot-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytm-companion-slot[data-content-type] > ytm-companion-ad-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-search-pyv-renderer,
 
 /* --- confirmed present in current lists --- */
-html:not([data-ytac-feed-off]) #masthead-ad,
-html:not([data-ytac-feed-off]) #player-ads,
-html:not([data-ytac-feed-off]) #shopping-timely-shelf,
-html:not([data-ytac-feed-off]) #sticker-layer,
-html:not([data-ytac-feed-off]) yt-overlay-product-sticker,
-html:not([data-ytac-feed-off]) .ytp-suggested-action,
-html:not([data-ytac-feed-off]) .ytp-featured-product,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) #masthead-ad,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) #player-ads,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) #shopping-timely-shelf,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) #sticker-layer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) yt-overlay-product-sticker,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) .ytp-suggested-action,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) .ytp-featured-product,
 
 /* --- legacy names, harmless if unmatched --- */
-html:not([data-ytac-feed-off]) ytd-display-ad-renderer,
-html:not([data-ytac-feed-off]) ytd-promoted-sparkles-web-renderer,
-html:not([data-ytac-feed-off]) ytd-promoted-sparkles-text-search-renderer,
-html:not([data-ytac-feed-off]) ytd-promoted-video-renderer,
-html:not([data-ytac-feed-off]) ytd-in-feed-ad-layout-renderer,
-html:not([data-ytac-feed-off]) ytd-banner-promo-renderer,
-html:not([data-ytac-feed-off]) ytd-statement-banner-renderer,
-html:not([data-ytac-feed-off]) ytd-video-masthead-ad-v3-renderer,
-html:not([data-ytac-feed-off]) ytd-primetime-promo-renderer,
-html:not([data-ytac-feed-off]) ytd-companion-slot-renderer,
-html:not([data-ytac-feed-off]) ytd-action-companion-ad-renderer,
-html:not([data-ytac-feed-off]) ytm-promoted-video-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-display-ad-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-promoted-sparkles-web-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-promoted-sparkles-text-search-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-promoted-video-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-in-feed-ad-layout-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-banner-promo-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-statement-banner-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-video-masthead-ad-v3-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-primetime-promo-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-companion-slot-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytd-action-companion-ad-renderer,
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) ytm-promoted-video-renderer,
 
-html:not([data-ytac-feed-off]) [data-ytac-hidden="1"] {
+html:not([data-ytac-feed-off]):not([data-ytac-watch]) [data-ytac-hidden="1"] {
   display: none !important;
 }
 

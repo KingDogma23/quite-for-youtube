@@ -39,7 +39,7 @@
   // content script reports the NEW version while running the OLD logic — it
   // lies about exactly the thing CLAUDE.md's first gate exists to check, and
   // twice a result was reported from a build that was not running.
-  const VERSION = "0.31.24";
+  const VERSION = "0.31.27";
 
   /**
    * Orphan guard. The Facebook build has had this since 2.4.1; this one never
@@ -1023,8 +1023,33 @@
     }
   }
 
+  /**
+   * Skipping and seeking past a video advert is OFF by default since 0.31.25,
+   * and gated here rather than on settings.skipVideoAds so a stored setting
+   * cannot switch it back on.
+   *
+   * Bisected on the live site 2026-09-03, each arm against a clean baseline
+   * confirmed immediately before it:
+   *
+   *   inject OFF, stylesheet ON,  loop ON   WALL, readyState 0
+   *   inject OFF, stylesheet OFF, loop ON   WALL — and ttff shows the video
+   *                                         PLAYED first (playing=4604,
+   *                                         advancing=4853) and was walled
+   *                                         afterwards
+   *
+   * The second arm has inject.js off and every CSS gate set, so the loop is
+   * the only thing left running, and it walls on its own. The ttff shape says
+   * how: the advert starts, this function seeks past it, and the wall replaces
+   * a player that was already advancing.
+   *
+   * That is the whole trade. Skipping the advert is what costs the video, and
+   * ~60 versions aimed at the response and network path never touched the part
+   * that actually trips it. ?ytacskip=1 turns it back on for measurement.
+   */
+  const SKIP_ON = location.search.indexOf("ytacskip=1") !== -1;
+
   function handleVideoAd() {
-    if (!settings.skipVideoAds || !adIsPlaying()) {
+    if (!SKIP_ON || !settings.skipVideoAds || !adIsPlaying()) {
       // Only treat the advert as finished after a sustained gap, so the flicker
       // around a skip or seek does not re-open crediting mid-advert. A genuine
       // second advert — a pod, or a mid-roll later on — is still counted, since
@@ -1219,8 +1244,26 @@
     off("data-ytac-all-off", on);
     off("data-ytac-strip-off", on && settings.stripAdSchedule);
 
-    off("data-ytac-feed-off", on && settings.hideFeedAds && !noCss);
-    off("data-ytac-overlay-off", on && settings.hideOverlays && !noCss);
+    // ?ytacnocss=1 takes down the feed rules and the in-player overlay rules
+    // together, and they are very different things: the feed rules hide ad
+    // containers out in the page, the overlay rules hide nodes INSIDE the
+    // player. On 2026-09-03 the stylesheet as a whole was measured to wall the
+    // video before it ever starts (ttff empty, readyState 0), so these two
+    // switches exist to say WHICH half does it — the feed hiding is the only
+    // function of this extension that is not implicated in the wall, and it
+    // should not be thrown away on a guess.
+    // On /watch the feed rules stand down entirely — see the header comment in
+    // content.css. This is an attribute rather than a media query because CSS
+    // cannot see the route, and it has to survive soft navigation, so tick()
+    // refreshes it.
+    if (location.pathname === "/watch") root.setAttribute("data-ytac-watch", "1");
+    else root.removeAttribute("data-ytac-watch");
+
+    const noFeed = location.search.indexOf("ytacnofeed=1") !== -1;
+    const noOverlay = location.search.indexOf("ytacnooverlay=1") !== -1;
+
+    off("data-ytac-feed-off", on && settings.hideFeedAds && !noCss && !noFeed);
+    off("data-ytac-overlay-off", on && settings.hideOverlays && !noCss && !noOverlay);
     // Merch is opt-IN, so the attribute is present only when it should hide.
     if (on && settings.hideMerch && !noCss) root.setAttribute("data-ytac-merch-off", "1");
     else root.removeAttribute("data-ytac-merch-off");
@@ -1231,6 +1274,16 @@
   function tick() {
     if (stopped) return;
     if (!contextAlive()) return shutdown();
+    // Soft navigation does not re-run applyCssToggles, and a stale
+    // data-ytac-watch would either leak the hiding onto a watch page (the wall)
+    // or suppress it on the home feed (silently doing nothing).
+    try {
+      const r = document.documentElement;
+      if (location.pathname === "/watch") r.setAttribute("data-ytac-watch", "1");
+      else r.removeAttribute("data-ytac-watch");
+    } catch {
+      /* reporting only */
+    }
     // The player loop must not run during a bypass either: it clicks, seeks
     // and changes playbackRate, none of which a control arm may do.
     if (!settings.enabled || location.search.indexOf("ytacoff=1") !== -1) return;
