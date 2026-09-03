@@ -1403,14 +1403,20 @@
       // and the pair was credited once. A second advert inside a pod is now
       // detected by the media being replaced — see newAdStarted() below —
       // rather than by a gap that does not exist.
-      if (!adGoneSince) {
-        adGoneSince = Date.now();
-        // An advert ran under an action mode and no action landed on it — an
-        // unskippable in click mode, say. It reached playback and was watched
-        // through; it is counted, or the arm's own readout undercounts.
+      if (!adGoneSince) adGoneSince = Date.now();
+      else if (Date.now() - adGoneSince > AD_GAP_MS) {
+        // The advert is over — not merely flickered off for a tick, which the
+        // class does around a skip. Only NOW settle an advert that ran under an
+        // action mode with no action landing on it (an unskippable in click
+        // mode): it reached playback and was watched through, and it is
+        // counted, or the arm's own readout undercounts. Settling on the first
+        // gap tick instead would credit a flicker as "played through" and a
+        // Skip landing a moment later would be swallowed by recordAd's early
+        // return — a skipped advert counted as watched.
         if (adPendingCredit) creditPlayedThrough();
         adPendingCredit = false;
-      } else if (Date.now() - adGoneSince > AD_GAP_MS) adCredited = false;
+        adCredited = false;
+      }
       lastAdCt = 0;
       unquietAd();
       return;

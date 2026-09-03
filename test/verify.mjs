@@ -231,7 +231,8 @@ check('content: ad skip/seek is OFF by default (?ytacskip=<mode> opts in)',
 // readout undercounts. It is settled at the gap, and for a pod when the next
 // advert begins.
 check('content: an advert under an action mode is credited at the gap if no action landed',
-      /if \(adPendingCredit\) creditPlayedThrough\(\);/.test(contentCode) &&
+      /> AD_GAP_MS\) \{[\s\S]{0,700}?if \(adPendingCredit\) creditPlayedThrough\(\);/.test(contentCode) &&
+      !/if \(!adGoneSince\) \{[\s\S]{0,300}?creditPlayedThrough/.test(contentCode) &&
       /if \(!adCredited\) adPendingCredit = true;/.test(contentCode) &&
       (contentCode.match(/creditPlayedThrough\(\)/g) || []).length >= 4,
       'default path, gap path and pod path all share one credit');
