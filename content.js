@@ -39,7 +39,7 @@
   // content script reports the NEW version while running the OLD logic — it
   // lies about exactly the thing CLAUDE.md's first gate exists to check, and
   // twice a result was reported from a build that was not running.
-  const VERSION = "0.31.51";
+  const VERSION = "0.31.52";
 
   /**
    * Orphan guard. The Facebook build has had this since 2.4.1; this one never
@@ -1847,7 +1847,18 @@
           document.documentElement.getAttribute("data-ytac-hidden") || "?",
         strategy:
           document.documentElement.getAttribute("data-ytac-strategy") || "none yet",
-        walled: /Ad blockers violate/i.test(document.body?.innerText || ""),
+        // Two branches, OR-ed. The text branch is what every measurement today
+        // used and matches the English wall exactly — and only the English one,
+        // so for a viewer with YouTube in another language the report said
+        // "wall on screen: no" during a wall. The structural branch is the
+        // element the wall renders as, the one the maintained blockers' filter
+        // lists name. UNVERIFIED LIVE as of 2026-09-03: it was added after the
+        // day's last wall had cleared, and deliberately not by triggering
+        // another. It is OR-ed, so it cannot regress the English reading; a
+        // check requires it to be absent on a normal page.
+        walled:
+          /Ad blockers violate/i.test(document.body?.innerText || "") ||
+          !!document.querySelector("ytd-enforcement-message-view-model"),
         page: {
           playerFound: !!player(),
           adPlayingNow: adIsPlaying(),

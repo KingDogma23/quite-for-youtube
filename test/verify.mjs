@@ -558,6 +558,20 @@ check('CONTROL: the old description DOES trip that check — so it can fail',
       ),
       'the wording shipped until 0.31.41');
 
+/* ---- 2g. the wall detector is not English-only --------------------------- */
+
+// The report's "anti-adblock wall on screen" line was a regex on English
+// innerText — a diagnostic that lies for any other UI language, in exactly the
+// case it exists for. A structural branch is OR-ed alongside it.
+check('content: the wall detector has a structural branch, not only English text',
+      /walled:\s*\n?\s*\/Ad blockers violate\/i\.test\([\s\S]{0,80}\|\|\s*!!document\.querySelector\("ytd-enforcement-message-view-model"\)/.test(contentCode),
+      'English innerText alone reads "no" during a wall in any other language');
+// CONTROL. Drop the structural branch and require the check to trip.
+const textOnly = contentCode.replace(/\s*\|\|\s*!!document\.querySelector\("ytd-enforcement-message-view-model"\)/, '');
+check('CONTROL: an English-only detector DOES trip that check — so it can fail',
+      textOnly !== contentCode && !/ytd-enforcement-message-view-model/.test(textOnly),
+      'the 0.31.51 detector');
+
 /* ---- 3. the build can be identified, and the arm is stated ------------- */
 
 const lit = /const VERSION = "([^"]+)"/.exec(content);
