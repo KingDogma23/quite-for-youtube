@@ -45,6 +45,15 @@ const contentCode = stripJs(content);
 const out = [];
 const check = (name, pass, detail) => out.push({ name, pass: !!pass, detail });
 
+/*
+ * EVERY control built with .replace() carries a `copy !== original` guard.
+ * A replace whose target text has drifted silently does nothing, and the
+ * control then passes on an unchanged file — which is a control that cannot
+ * fail. It happened twice today (the pod control, and an earlier one that
+ * split on the wrong fragment) before this became a rule. Controls that
+ * APPEND or test a literal cannot be vacuous and carry no guard.
+ */
+
 /* ---- 1. the stylesheet hides adverts, not the page ---------------------- */
 
 // Selectors that must never appear as a whole-element hide. Each is either the
@@ -96,7 +105,7 @@ const hardCss = cssCode.replace('  opacity: 0 !important;\n  pointer-events: non
                             '  display: none !important;');
 const regressedBlocks = hardCss.split('}').filter(b => AD_SELECTORS.test(b));
 check('CONTROL: display:none on an ad container DOES trip that check — so it can fail',
-      regressedBlocks.filter(b => /display:\s*none/.test(b)).length > 0,
+      hardCss !== cssCode && regressedBlocks.filter(b => /display:\s*none/.test(b)).length > 0,
       'the 0.31.35 behaviour, which walled the video on an in-session click');
 
 // data-ytac-hidden is the tab-visibility VALIDITY flag on <html>. No CSS rule
@@ -383,7 +392,7 @@ check('preview: is from this version series, not a museum piece',
 // CONTROL. Drop a field from the preview and require the check to trip.
 const previewDrifted = preview.replace('videoAdsPlayedThrough', 'xxxDrifted');
 check('CONTROL: a field missing from the preview DOES trip that check — so it can fail',
-      readsFields.filter(f => !previewDrifted.includes(f)).length > 0,
+      previewDrifted !== preview && readsFields.filter(f => !previewDrifted.includes(f)).length > 0,
       'fixture drift is now a build failure, not something someone has to notice');
 
 /* ---- 2e. the popup must describe what the build actually does ----------- */
@@ -408,7 +417,7 @@ check('popup: the headline stat is one that actually moves',
 const stalePopup = popupHtml.replace('Ads muted and hidden as they appear',
                                      'Ads skipped as they appear');
 check('CONTROL: stale copy DOES trip that check — so it can fail',
-      STALE_CLAIMS.some(c => stalePopup.includes(c)),
+      stalePopup !== popupHtml && STALE_CLAIMS.some(c => stalePopup.includes(c)),
       'the 0.31.39 copy, which described a feature that had been disabled');
 
 /* ---- 2f. what we TELL people must match what the build does ------------- */
@@ -448,7 +457,8 @@ check('content: VERSION literal matches the manifest',
 const drifted = content.replace(/const VERSION = "[^"]+"/, 'const VERSION = "0.0.0"');
 const driftLit = /const VERSION = "([^"]+)"/.exec(drifted);
 check('CONTROL: a drifted literal DOES fail that check — so it can fail',
-      driftLit[1] !== manifest.version, `sabotaged copy reports ${driftLit[1]}`);
+      drifted !== content && driftLit[1] !== manifest.version,
+      `sabotaged copy reports ${driftLit[1]}`);
 
 check('popup: the report states which arm it is', /ARM:/.test(popup),
       'a bypassed run and a live one read identically without this');
@@ -460,8 +470,9 @@ check('content: the diagnostics payload carries both arm signals',
       'the popup cannot state an arm the content script never sends');
 
 // CONTROL. Strip the ARM line and require the check to fail.
+const noArm = popup.replace(/ARM:/g, 'xxx');
 check('CONTROL: removing the ARM line DOES fail that check — so it can fail',
-      !/ARM:/.test(popup.replace(/ARM:/g, 'xxx')), 'sabotaged copy has no arm marker');
+      noArm !== popup && !/ARM:/.test(noArm), 'sabotaged copy has no arm marker');
 
 let bad = 0;
 console.log('');
