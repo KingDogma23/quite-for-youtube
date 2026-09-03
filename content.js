@@ -1346,8 +1346,16 @@
    *   cross   click mode on an unskippable (no button): rate 1, no jump, cover
    *           and mute on — speed and seek did not leak in
    *
-   * What none of that measures is the wall. That needs a real advert on a load
-   * carrying the switch; the popup report carries the result.
+   * THE WALL, MEASURED for click, 2026-09-03 late evening. An arm page left
+   * playing with ?ytacskip=click for a full 744-second video got no advert;
+   * at the video's end an advert arrived — sightings 3, lastsighting
+   * watch:ad-showing:no-reel-slot — and the page read WALL, readyState 0.
+   * The played-through counter stayed 0 with the advert gone, and the pending
+   * credit settles 3s after any gap, so it was never pending: recordAd() had
+   * already credited it, which only the Skip press does. The loop pressed
+   * Skip, and the wall followed. A programmatic press — isTrusted:false — is
+   * detected. Speed and seek remain unmeasured; the flag they would need a
+   * clean baseline for was set by this arm.
    */
   const SKIP_MODE = (() => {
     const m = /[?&]ytacskip=([a-z0-9,]+)/i.exec(location.search);
