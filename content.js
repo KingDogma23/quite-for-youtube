@@ -1213,7 +1213,13 @@
   // new one began is currentTime going backwards as the media is swapped.
   let lastAdCt = 0;
 
-  /** True once per advert, including the second and third of a pod. */
+  /**
+   * True once per advert, including the second and third of a pod.
+   *
+   * Verified 2026-09-03 on 0.31.42, both arms: a half-second backwards jitter
+   * left the count at 1, a jump to 0 with the advert condition still set took
+   * it to 2, and the cover released cleanly afterwards.
+   */
   function newAdStarted(video) {
     if (!video || !Number.isFinite(video.currentTime)) return false;
     const now = video.currentTime;
