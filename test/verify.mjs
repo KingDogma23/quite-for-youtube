@@ -206,6 +206,24 @@ check('CONTROL: removing the skip gate DOES fail that check — so it can fail',
       unskipped !== content && !/if \(!SKIP_ON\) \{/.test(unskipped),
       'the 0.31.24 behaviour, which walled the video on a live measurement');
 
+// A pod plays its adverts back to back with NO gap, so a gap-based reset can
+// never fire between them: a real two-advert pod was credited once on
+// 2026-09-03, while the comment claimed pods were counted.
+check('content: a second advert in a pod re-opens crediting',
+      /function newAdStarted\(/.test(contentCode) &&
+      /if \(newAdStarted\([\s\S]{0,60}\) adCredited = false;/.test(contentCode),
+      'the gap reset cannot fire inside a pod — there is no gap');
+check('content: the playhead is forgotten when the break ends',
+      /lastAdCt = 0;/.test(contentCode),
+      'else the first advert of the next break looks like a continuation');
+
+// CONTROL. Remove the pod detection and require the check to trip.
+const noPod = contentCode.replace(/if \(newAdStarted\([\s\S]*?\)\) adCredited = false;/, '');
+check('CONTROL: dropping pod detection DOES trip that check — so it can fail',
+      noPod !== contentCode &&
+      !/if \(newAdStarted\([\s\S]{0,60}\) adCredited = false;/.test(noPod),
+      'the 0.31.41 behaviour: two adverts counted as one');
+
 /* ---- 2c. quiet ads: cover and mute, never remove ------------------------ */
 
 // The cover must be OUR node laid on top, never a rule against a YouTube

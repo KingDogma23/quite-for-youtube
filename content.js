@@ -39,7 +39,7 @@
   // content script reports the NEW version while running the OLD logic — it
   // lies about exactly the thing CLAUDE.md's first gate exists to check, and
   // twice a result was reported from a build that was not running.
-  const VERSION = "0.31.41";
+  const VERSION = "0.31.42";
 
   /**
    * Orphan guard. The Facebook build has had this since 2.4.1; this one never
@@ -1208,20 +1208,45 @@
    */
   const SKIP_ON = location.search.indexOf("ytacskip=1") !== -1;
 
+  // The playhead of the advert we are currently crediting. A pod plays its
+  // adverts back to back through the SAME element, so the only signal that a
+  // new one began is currentTime going backwards as the media is swapped.
+  let lastAdCt = 0;
+
+  /** True once per advert, including the second and third of a pod. */
+  function newAdStarted(video) {
+    if (!video || !Number.isFinite(video.currentTime)) return false;
+    const now = video.currentTime;
+    // A full second of slack: an advert's own playhead only ever moves forward,
+    // so a backwards jump is a new media, not jitter.
+    const restarted = now + 1 < lastAdCt;
+    lastAdCt = now;
+    return restarted;
+  }
+
   function handleVideoAd() {
     if (!settings.skipVideoAds || !adIsPlaying()) {
       // Only treat the advert as finished after a sustained gap, so the flicker
-      // around a skip or seek does not re-open crediting mid-advert. A genuine
-      // second advert — a pod, or a mid-roll later on — is still counted, since
-      // the gap between them exceeds this.
+      // around a skip or seek does not re-open crediting mid-advert.
+      //
+      // This used to claim a pod was "still counted, since the gap between them
+      // exceeds this". MEASURED FALSE on 2026-09-03: a real two-advert pod ran
+      // back to back with no gap at all, ad-showing never cleared between them,
+      // and the pair was credited once. A second advert inside a pod is now
+      // detected by the media being replaced — see newAdStarted() below —
+      // rather than by a gap that does not exist.
       if (!adGoneSince) adGoneSince = Date.now();
       else if (Date.now() - adGoneSince > AD_GAP_MS) adCredited = false;
+      lastAdCt = 0;
       unquietAd();
       return;
     }
     adGoneSince = 0;
 
     const p = player();
+
+    // Re-open crediting when the pod moves to its next advert.
+    if (newAdStarted(p && p.querySelector("video"))) adCredited = false;
 
     // COUNT FIRST, ACT SECOND. 0.31.25 gated the whole function on SKIP_ON, so
     // with skipping off the extension stopped counting the adverts it could
