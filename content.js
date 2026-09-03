@@ -39,7 +39,7 @@
   // content script reports the NEW version while running the OLD logic — it
   // lies about exactly the thing CLAUDE.md's first gate exists to check, and
   // twice a result was reported from a build that was not running.
-  const VERSION = "0.31.38";
+  const VERSION = "0.31.39";
 
   /**
    * Orphan guard. The Facebook build has had this since 2.4.1; this one never
@@ -831,11 +831,23 @@
    * tick of the advert starting, and DOWN within 1010ms of it ending, with the
    * mute released in the same pass. That number matters — a cover that lingers
    * is a black screen over the viewer's own video, which is the worst thing
-   * this file can do. It was measured rather than assumed after a single
-   * reading showed the cover still up 3s after the advert cleared; that
-   * reading coincided with a theatre-mode toggle in the same instant and did
-   * not reproduce (2013ms on a deliberate retry), so it is recorded as
-   * observed-once and unexplained, not as a known bug.
+   * this file can do.
+   *
+   * EXPLAINED 2026-09-03, having first been recorded as "observed once,
+   * unexplained". Two causes, neither of them a stuck cover:
+   *
+   *   1. A hidden tab throttles the 400ms tick to once a second, or once a
+   *      MINUTE when heavily throttled — see the interval below. Every reading
+   *      that looked slow carried visibilityState "hidden", and
+   *      data-ytac-hidden was 1 throughout. The validity flag said the reading
+   *      was void and it was read anyway.
+   *   2. YouTube RE-ADDS ad-showing after it is cleared. A reading at +3s
+   *      showed the class back on, so the advert condition genuinely persisted
+   *      and the cover was correct to still be up.
+   *
+   * With the condition actually clear, release measured 2009ms in a hidden tab
+   * and about 1s in a visible one. The visibilitychange handler below ticks the
+   * moment the tab is looked at, so a viewer never waits on the throttle.
    *
    * ?ytacnoquiet=1 turns it off.
    */
@@ -885,21 +897,32 @@
     }
   }
 
+  /**
+   * Hand the mute back — and ONLY if it was ours to hand back.
+   *
+   * Shared with restoreSpeed(), which used to do `video.muted = false`
+   * unconditionally: a viewer who had muted the video themselves before the
+   * advert got sound blasted at them when the speed was restored. Dormant,
+   * because the fast-forward path it lives on is off by default, but wrong.
+   */
+  function restoreMute() {
+    if (!mutedByUs) return;
+    const v = document.querySelector(".html5-video-player video");
+    // Only hand back the state we found. If the viewer muted it themselves
+    // mid-advert, priorMuted is what they had BEFORE, so honour their action
+    // instead: leave a muted player muted only if that is what they chose.
+    if (v && priorMuted === false && v.muted) v.muted = false;
+    mutedByUs = false;
+    priorMuted = null;
+  }
+
   /** Undo it the moment the advert is gone, and restore the viewer's own mute. */
   function unquietAd() {
     if (coverEl) {
       coverEl.remove();
       coverEl = null;
     }
-    if (mutedByUs) {
-      const v = document.querySelector(".html5-video-player video");
-      // Only hand back the state we found. If the viewer muted it themselves
-      // mid-advert, priorMuted is what they had BEFORE, so honour their action
-      // instead: leave a muted player muted only if that is what they chose.
-      if (v && priorMuted === false && v.muted) v.muted = false;
-      mutedByUs = false;
-      priorMuted = null;
-    }
+    restoreMute();
   }
 
   function publishPlayedThrough() {
@@ -1259,6 +1282,10 @@
     // held back as the last resort precisely because getting it wrong is not.
     if (video.playbackRate < 8) {
       video.playbackRate = 16;
+      if (!mutedByUs) {
+        priorMuted = video.muted;
+        mutedByUs = true;
+      }
       video.muted = true;
       session.spedUp++;
       recordAd(Math.max(video.duration - video.currentTime, 0));
@@ -1317,7 +1344,7 @@
     const video = player()?.querySelector("video");
     if (video && video.playbackRate > 8) {
       video.playbackRate = 1;
-      video.muted = false;
+      restoreMute();
     }
   }
 

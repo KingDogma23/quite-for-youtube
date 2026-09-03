@@ -33,7 +33,14 @@ const css = read('content.css'), inject = read('inject.js'), popup = read('popup
 // Comments mention the very selectors and properties these checks look for,
 // so every selector-level check runs against the stripped source.
 const cssCode = css.replace(/\/\*[\s\S]*?\*\//g, '');
+// Same for JS. Four separate checks today matched prose in a comment that
+// described the very thing the check forbade, and reported the code guilty or
+// innocent on that basis. Strip comments once, here, and use these everywhere
+// a check is about what the CODE does.
+const stripJs = (src) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 const content = read('content.js');
+const contentCode = stripJs(content);
 
 const out = [];
 const check = (name, pass, detail) => out.push({ name, pass: !!pass, detail });
@@ -245,6 +252,24 @@ check('CONTROL: a shutdown without release DOES fail that check — so it can fa
 check('content: the cover countdown is bounded by MAX_AD_SECONDS',
       /raw <= MAX_AD_SECONDS \? raw : null/.test(content),
       'a live stream made the first version read "8725s"');
+
+// No path may unmute unconditionally. restoreSpeed() did, so a viewer who had
+// muted the video themselves got sound blasted at them when speed was handed
+// back.
+const unconditionalUnmute = /\.muted = false/g;
+const guarded = /priorMuted === false && v\.muted\) v\.muted = false/;
+check('content: nothing unmutes unconditionally',
+      (contentCode.match(unconditionalUnmute) || []).length === 1 &&
+      guarded.test(contentCode),
+      'the single permitted site is the guarded one inside restoreMute()');
+
+// CONTROL. Add an unguarded unmute back and require the check to trip.
+const blaring = contentCode.replace('      restoreMute();\n    }',
+                                    '      video.muted = false;\n    }');
+check('CONTROL: an unguarded unmute DOES trip that check — so it can fail',
+      blaring !== contentCode &&
+      (blaring.match(unconditionalUnmute) || []).length > 1,
+      'the 0.31.38 behaviour in restoreSpeed()');
 
 check('content: the viewer\'s own mute state is restored, not clobbered',
       /priorMuted === false && v\.muted/.test(content),
