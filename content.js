@@ -39,7 +39,7 @@
   // content script reports the NEW version while running the OLD logic — it
   // lies about exactly the thing CLAUDE.md's first gate exists to check, and
   // twice a result was reported from a build that was not running.
-  const VERSION = "0.31.44";
+  const VERSION = "0.31.45";
 
   /**
    * Orphan guard. The Facebook build has had this since 2.4.1; this one never
@@ -1208,6 +1208,23 @@
    */
   const SKIP_ON = location.search.indexOf("ytacskip=1") !== -1;
 
+  /**
+   * ?ytacoff=1, read ONCE.
+   *
+   * inject.js and the CSS gates decide the bypass at document_start and keep
+   * it for the life of the page, soft navigations included. tick() used to
+   * re-read location.search every pass, so the first in-session click — whose
+   * URL no longer carries the switch — silently switched the loop back on
+   * while data-ytac-bypassed still read 1 and the popup said BYPASSED.
+   * Measured 2026-09-03: on that hop the cover appeared and the video muted.
+   * A control arm with its loop running is not a control.
+   *
+   * Verified on 0.31.45: bypassed load, click into a video, set the advert
+   * condition — no cover, no mute, data-ytac-bypassed still 1. The same
+   * condition on a normal load covered and muted, so the normal path is intact.
+   */
+  const BYPASSED = location.search.indexOf("ytacoff=1") !== -1;
+
   // The playhead of the advert we are currently crediting. A pod plays its
   // adverts back to back through the SAME element, so the only signal that a
   // new one began is currentTime going backwards as the media is swapped.
@@ -1451,8 +1468,7 @@
     // "this one feature off". The wall repair keys off this and nothing else.
     // ?ytacoff=1 disables the whole extension for one page load, so the same
     // video can be measured with it on and off. Diagnostic only.
-    const bypass = location.search.indexOf("ytacoff=1") !== -1;
-    const on = settings.enabled && !bypass;
+    const on = settings.enabled && !BYPASSED;
 
     // ?ytacnocss=1 — the stylesheet stands down, the rest stays on. Every rule
     // in content.css is gated on one of these attributes, so setting them all
@@ -1503,7 +1519,7 @@
     // an advert used to return here with the cover still up and the sound
     // still off, permanently — and a black screen is exactly what sends
     // someone to the off switch, so the off switch made it stick.
-    if (!settings.enabled || location.search.indexOf("ytacoff=1") !== -1) {
+    if (!settings.enabled || BYPASSED) {
       unquietAd();
       return;
     }

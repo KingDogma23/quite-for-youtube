@@ -175,6 +175,27 @@ check('CONTROL: an unconditional observer DOES trip that check — so it can fai
       alwaysObserve !== injectCode && !/if \(noRewrite && OBSERVE_ON\)/.test(alwaysObserve),
       'the 0.31.42 behaviour: a fingerprintable fetch on every load');
 
+/* ---- 2a3. the bypass is decided once, for the whole page ---------------- */
+
+// inject.js and the CSS gates read ?ytacoff=1 at document_start and keep the
+// answer through soft navigations. tick() re-read the URL every pass, so the
+// first click un-bypassed the loop while the ARM line still said BYPASSED.
+const bypassReads = (contentCode.match(/indexOf\("ytacoff=1"\)/g) || []).length;
+check('content: ?ytacoff=1 is read exactly once, into BYPASSED',
+      bypassReads === 1 && /const BYPASSED = location\.search\.indexOf\("ytacoff=1"\)/.test(contentCode),
+      `${bypassReads} reads of the switch (want 1 — every other site must use BYPASSED)`);
+check('content: the loop gate uses BYPASSED, not a live URL read',
+      /if \(!settings\.enabled \|\| BYPASSED\)/.test(contentCode),
+      'a live read un-bypasses on the first in-session click');
+
+// CONTROL. Put the live read back in the loop gate and require the check to trip.
+const liveRead = contentCode.replace('if (!settings.enabled || BYPASSED)',
+                                     'if (!settings.enabled || location.search.indexOf("ytacoff=1") !== -1)');
+check('CONTROL: a live URL read in the loop gate DOES trip that check — so it can fail',
+      liveRead !== contentCode &&
+      (liveRead.match(/indexOf\("ytacoff=1"\)/g) || []).length > 1,
+      'the 0.31.44 behaviour: a half-bypassed hop reported as fully bypassed');
+
 /* ---- 2b. the third measured trigger: the ad-skip loop ------------------ */
 
 // Bisected 2026-09-03 against clean baselines: with inject.js off AND every
@@ -293,7 +314,7 @@ check('content: shutdown() releases the cover and the mute',
       /unquietAd\(\)/.test(shutdownBody),
       'reloading the extension mid-advert strands the cover otherwise');
 check('content: disabling Protection mid-advert releases them too',
-      /if \(!settings\.enabled \|\| location\.search[\s\S]{0,80}\{\s*\n\s*unquietAd\(\);/.test(content),
+      /if \(!settings\.enabled \|\| BYPASSED\) \{\s*\n\s*unquietAd\(\);/.test(contentCode),
       'a black screen sends people to the off switch; it must not make it stick');
 
 // CONTROL. Take the release back out of shutdown and require the check to fail.
