@@ -39,7 +39,7 @@
   // content script reports the NEW version while running the OLD logic — it
   // lies about exactly the thing CLAUDE.md's first gate exists to check, and
   // twice a result was reported from a build that was not running.
-  const VERSION = "0.31.27";
+  const VERSION = "0.31.30";
 
   /**
    * Orphan guard. The Facebook build has had this since 2.4.1; this one never
@@ -717,7 +717,8 @@
   // are not mistaken for the same "video".
   const currentVideoId = () =>
     (location.search.match(/[?&]v=([\w-]{11})/) || [])[1] || location.pathname;
-  let lifetime = { adsBlocked: 0, leaked: 0, secondsSaved: 0, adsSkipped: 0, since: null, blockedFixed: false };
+  let lifetime = { adsBlocked: 0, leaked: 0, secondsSaved: 0, adsSkipped: 0,
+    adsPlayedThrough: 0, since: null, blockedFixed: false };
   let lifetimeDirty = false;
 
   function loadLifetime() {
@@ -781,6 +782,32 @@
   // as finished once it has been absent for this long.
   let adGoneSince = 0;
   const AD_GAP_MS = 3000;
+
+  /**
+   * The played-through count, on the page.
+   *
+   * Everything else about this build can be read from an attribute; this — the
+   * number that says what the trade COSTS — could only be read by copying a
+   * popup report by hand, which is why a false 0 survived a live test.
+   */
+  /**
+   * Published as "0" at start, deliberately.
+   *
+   * An ABSENT attribute and a zero count are different states — "no advert has
+   * appeared yet" versus "this code never ran" — and letting them collapse into
+   * one reading is what produced two false verdicts today. Presence proves the
+   * counter is live; the value is the count.
+   */
+  function publishPlayedThrough() {
+    try {
+      document.documentElement.setAttribute(
+        "data-ytac-adsplayed",
+        String(session.videoAdsPlayedThrough),
+      );
+    } catch {
+      /* reporting only */
+    }
+  }
 
   function recordAd(seconds) {
     vid.adSeen = true;
@@ -898,6 +925,12 @@
   const session = {
     videoAdsSkipped: 0,
     videoAdsSeeked: 0,
+    // Adverts that reached playback and were NOT acted on. This is the headline
+    // cost of the current default and it needs its own counter: the popup used
+    // to derive "video ads reaching playback" as skipped + seeked, which with
+    // skipping off is permanently 0 — a number that could never report the
+    // thing it named. Two mid-rolls were sat through and the report said 0.
+    videoAdsPlayedThrough: 0,
     overlaysClosed: 0,
     seekBlocked: 0,
     spedUp: 0,
@@ -1049,7 +1082,7 @@
   const SKIP_ON = location.search.indexOf("ytacskip=1") !== -1;
 
   function handleVideoAd() {
-    if (!SKIP_ON || !settings.skipVideoAds || !adIsPlaying()) {
+    if (!settings.skipVideoAds || !adIsPlaying()) {
       // Only treat the advert as finished after a sustained gap, so the flicker
       // around a skip or seek does not re-open crediting mid-advert. A genuine
       // second advert — a pod, or a mid-roll later on — is still counted, since
@@ -1061,6 +1094,28 @@
     adGoneSince = 0;
 
     const p = player();
+
+    // COUNT FIRST, ACT SECOND. 0.31.25 gated the whole function on SKIP_ON, so
+    // with skipping off the extension stopped counting the adverts it could
+    // plainly see: a report on 2026-09-03 said "video ads reaching playback: 0"
+    // while carrying 3 ad sightings and a matched .ytp-skip-ad-button. An
+    // advert that reaches playback is the headline number of this build — it is
+    // what the trade COSTS — so it is recorded whether or not we may act.
+    if (!SKIP_ON) {
+      // NOT recordAd(): that credits lifetime.adsSkipped and secondsSaved, and
+      // nothing was skipped and no time was saved. Claiming either would be the
+      // extension taking credit for an advert the viewer sat through.
+      vid.adSeen = true;
+      if (!adCredited) {
+        adCredited = true;
+        session.videoAdsPlayedThrough++;
+        lifetime.adsPlayedThrough = (lifetime.adsPlayedThrough || 0) + 1;
+        lifetimeDirty = true;
+        publishPlayedThrough();
+      }
+      session.lastAction = "ad played through (skipping off — it triggers the wall)";
+      return;
+    }
 
     const skip = p.querySelector(SKIP_BUTTONS);
     if (isVisible(skip)) {
@@ -1313,6 +1368,8 @@
   function start() {
     console.log(`[YT Ad Cleaner ${VERSION}] active on ${location.pathname}`);
     applyCssToggles();
+    // Stamp the counter at zero so "no advert yet" cannot read as "never ran".
+    publishPlayedThrough();
 
     // ?ytacnoloop=1 — the player loop stands down, the stylesheet and the
     // page-world script stay on. Third of the three bisect switches.

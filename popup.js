@@ -89,7 +89,12 @@ function render(d, stored) {
   $("ver").textContent = "v" + d.version;
 
   const s = d.session;
-  const reached = s.videoAdsSkipped + s.videoAdsSeeked;
+  // Was skipped + seeked, which with skipping off is permanently 0 — the line
+  // read "video ads reaching playback: 0" in a live report that also carried
+  // 3 ad sightings and a matched skip button. An advert that reached playback
+  // and was left alone is still an advert that reached playback.
+  const reached =
+    s.videoAdsSkipped + s.videoAdsSeeked + (s.videoAdsPlayedThrough ?? 0);
   // WHICH ARM THIS IS, first line, always — the same marker the other three
   // extensions carry. A bypassed run and a live one produced identical-looking
   // reports until this existed.
@@ -108,13 +113,15 @@ function render(d, stored) {
     `Quite for YouTube v${d.version}  (page ${d.url})`,
     `all time: ${lt.adsBlocked} videos protected, ${lt.leaked ?? 0} leaked ` +
     `(rewrite fired, ad played anyway), ${humanTime(lt.secondsSaved)} saved, ` +
-      `${lt.adsSkipped || 0} ads skipped`,
+      `${lt.adsSkipped || 0} ads skipped, ${lt.adsPlayedThrough || 0} ads played ` +
+      `through (skipping is off by default — it triggers the wall)`,
     `on: ${Object.entries(d.settings).filter(([, v]) => v).map(([k]) => k).join(", ") || "nothing"}`,
     `ad payloads neutralised: cold-load ${d.rewrites ?? 0}, ${d.rewrote ?? "fetch=0,xhr=0"}`,
     `  (a clicked video uses the fetch path, where cold-load 0 is normal)`,
     `diagnostic switches in force: ${d.switches ?? "unknown"}`,
     `video ads reaching playback: ${reached} ` +
-      `(${s.videoAdsSkipped} skipped, ${s.spedUp ?? 0} sped up, ${s.videoAdsSeeked} seeked)`,
+      `(${s.videoAdsSkipped} skipped, ${s.spedUp ?? 0} sped up, ` +
+      `${s.videoAdsSeeked} seeked, ${s.videoAdsPlayedThrough ?? 0} played through)`,
     `anti-adblock wall on screen: ${d.walled ? "YES" : "no"}`,
     `false seeks reverted: ${s.falseSeeksReverted ?? 0}   (should always be 0)`,
     d.page.feedAds

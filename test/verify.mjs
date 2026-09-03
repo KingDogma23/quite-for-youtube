@@ -120,14 +120,61 @@ check('CONTROL: an opt-OUT rewrite DOES fail that check — so it can fail',
 const skipOptIn = /const SKIP_ON = location\.search\.indexOf\("ytacskip=1"\) !== -1/.test(content);
 check('content: ad skip/seek is OFF by default (?ytacskip=1 opts in)',
       skipOptIn, 'measured: loop alone => wall, after the video had started playing');
-check('content: the gate is checked before settings.skipVideoAds',
-      /if \(!SKIP_ON \|\| !settings\.skipVideoAds/.test(content),
-      'a stored setting must not be able to re-enable it');
+// The gate must NOT sit at the top of the function. 0.31.25 put it there and
+// the extension stopped counting adverts it could see — a live report said
+// "video ads reaching playback: 0" while carrying 3 ad sightings.
+check('content: an unskipped ad is still COUNTED (recordAd before the gate returns)',
+      /if \(!SKIP_ON\) \{[\s\S]{0,400}?recordAd\(/.test(content),
+      'a feature that cannot count what it saw cannot report the trade it is making');
+check('content: the SKIP_ON gate is not the first test in handleVideoAd',
+      !/function handleVideoAd\(\) \{\s*if \(!SKIP_ON/.test(content),
+      'gating the whole function disables the counting with the skipping');
+
+// CONTROL. Put the gate back at the top and require that check to fail.
+const regressed = content.replace(
+  'function handleVideoAd() {\n    if (!settings.skipVideoAds',
+  'function handleVideoAd() {\n    if (!SKIP_ON || !settings.skipVideoAds');
+check('CONTROL: the gate back at the top DOES fail that check — so it can fail',
+      regressed !== content &&
+      /function handleVideoAd\(\) \{\s*if \(!SKIP_ON/.test(regressed),
+      'the 0.31.25 regression, caught from a live popup report');
+
+// The report line must not be derived only from the actions the default
+// disables. "video ads reaching playback" was skipped + seeked, which is
+// permanently 0 with skipping off — it could not report its own subject.
+check('popup: "reaching playback" counts ads played through as well',
+      /videoAdsSkipped \+ s\.videoAdsSeeked \+ \(s\.videoAdsPlayedThrough/.test(popup),
+      'a counter gated on the value the default zeroes cannot ever fire');
+check('content: a played-through ad does NOT credit adsSkipped or secondsSaved',
+      /NOT recordAd\(\)/.test(content) &&
+      /session\.videoAdsPlayedThrough\+\+/.test(content),
+      'nothing was skipped and no time was saved — claiming either is a false number');
+check('content: the counter is published at ZERO on start, not left absent',
+      /publishPlayedThrough\(\);/.test(content.split('function start()')[1] || ''),
+      'absent and zero are different states — "no ad yet" vs "never ran"');
+
+check('content: the played-through count is readable from the page',
+      /data-ytac-adsplayed/.test(content),
+      'it could previously only be read by copying a popup report by hand');
+
+// CONTROL. Revert the report line and require the check to fail.
+const oldReport = popup.replace(
+  /const reached =\s*\n?\s*s\.videoAdsSkipped \+ s\.videoAdsSeeked \+ \(s\.videoAdsPlayedThrough \?\? 0\);/,
+  'const reached = s.videoAdsSkipped + s.videoAdsSeeked;');
+check('CONTROL: the old skipped+seeked line DOES fail that check — so it can fail',
+      oldReport !== popup &&
+      !/videoAdsSkipped \+ s\.videoAdsSeeked \+ \(s\.videoAdsPlayedThrough/.test(oldReport),
+      'the line that reported 0 while three ads had been seen');
+
+check('content: the skip ACTION is gated, not the whole function',
+      /if \(!SKIP_ON\) \{/.test(content) &&
+      /const SKIP_ON = location\.search/.test(content),
+      'a stored setting must not re-enable the action, but detection must survive');
 
 // CONTROL. Remove the gate and require both checks to fail.
-const unskipped = content.replace('!SKIP_ON || !settings.skipVideoAds', '!settings.skipVideoAds');
+const unskipped = content.replace('if (!SKIP_ON) {', 'if (false) {');
 check('CONTROL: removing the skip gate DOES fail that check — so it can fail',
-      unskipped !== content && !/if \(!SKIP_ON \|\| !settings\.skipVideoAds/.test(unskipped),
+      unskipped !== content && !/if \(!SKIP_ON\) \{/.test(unskipped),
       'the 0.31.24 behaviour, which walled the video on a live measurement');
 
 /* ---- 3. the build can be identified, and the arm is stated ------------- */
