@@ -188,3 +188,28 @@ html[data-ytac-watch]:not([data-ytac-nosofthide]):not([data-ytac-feed-off]) ytd-
   opacity: 0 !important;
   pointer-events: none !important;
 }
+
+/* ---------------------------------------------------------------------------
+ * The advert cover — see quietAd() in content.js.
+ *
+ * NOT a rule against a YouTube element: this is our own node, added on top.
+ * Nothing of YouTube's is hidden, resized or removed, so there is no ad
+ * container reading zero height and nothing for a bait check to find. That
+ * distinction is the whole reason this approach is available at all.
+ * ------------------------------------------------------------------------- */
+#ytac-ad-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  pointer-events: none;
+}
+
+#ytac-ad-cover .ytac-ad-cover__label {
+  font: 500 13px/1.4 "YouTube Sans", Roboto, system-ui, sans-serif;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.01em;
+}

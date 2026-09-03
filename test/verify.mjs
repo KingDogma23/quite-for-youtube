@@ -198,6 +198,38 @@ check('CONTROL: removing the skip gate DOES fail that check — so it can fail',
       unskipped !== content && !/if \(!SKIP_ON\) \{/.test(unskipped),
       'the 0.31.24 behaviour, which walled the video on a live measurement');
 
+/* ---- 2c. quiet ads: cover and mute, never remove ------------------------ */
+
+// The cover must be OUR node laid on top, never a rule against a YouTube
+// element — hiding one of theirs is what the wall detects.
+check('content: the ad cover is an element we add, not a YouTube node hidden',
+      /createElement\("div"\)[\s\S]{0,200}ytac-ad-cover/.test(content),
+      'nothing of YouTube\'s may be hidden, resized or removed');
+check('css: the cover styles target our own id only',
+      /#ytac-ad-cover/.test(css) &&
+      !/ytd-[a-z-]+[^{]*\{[^}]*z-index:\s*30/.test(css),
+      'a rule against their element would be a bait-check target');
+check('content: quiet mode never touches currentTime or playbackRate',
+      !/function quietAd\([\s\S]*?\n  \}/.test(content) ||
+      !/currentTime\s*=|playbackRate\s*=/.test(
+        (/function quietAd\([\s\S]*?\n  \}/.exec(content) || [''])[0]),
+      'seeking and fast-forwarding are both measured wall triggers');
+check('content: the cover countdown is bounded by MAX_AD_SECONDS',
+      /raw <= MAX_AD_SECONDS \? raw : null/.test(content),
+      'a live stream made the first version read "8725s"');
+
+check('content: the viewer\'s own mute state is restored, not clobbered',
+      /priorMuted === false && v\.muted/.test(content),
+      'only hand back the state we found');
+
+// CONTROL. Make quietAd seek and require that check to trip.
+const seeking = content.replace('if (!video.muted) video.muted = true;',
+                                'video.currentTime = video.duration;');
+const seekBody = (/function quietAd\([\s\S]*?\n  \}/.exec(seeking) || [''])[0];
+check('CONTROL: a seek inside quietAd DOES trip that check — so it can fail',
+      /currentTime\s*=/.test(seekBody),
+      'seeking is one of the four measured wall triggers');
+
 /* ---- 3. the build can be identified, and the arm is stated ------------- */
 
 const lit = /const VERSION = "([^"]+)"/.exec(content);

@@ -39,7 +39,7 @@
   // content script reports the NEW version while running the OLD logic — it
   // lies about exactly the thing CLAUDE.md's first gate exists to check, and
   // twice a result was reported from a build that was not running.
-  const VERSION = "0.31.32";
+  const VERSION = "0.31.34";
 
   /**
    * Orphan guard. The Facebook build has had this since 2.4.1; this one never
@@ -798,6 +798,85 @@
    * one reading is what produced two false verdicts today. Presence proves the
    * counter is live; the value is the count.
    */
+  /**
+   * QUIET ADS — mute and cover the advert instead of removing it.
+   *
+   * Every mechanism that REMOVES the advert was measured on 2026-09-03 to wall
+   * the video: the parse-time prune, the response rewrite, the skip/seek loop,
+   * and display:none on the ad containers. What did NOT wall it was hiding the
+   * containers with opacity — leaving YouTube's own machinery reading normal
+   * and changing only what the viewer sees.
+   *
+   * This is that same idea applied to the video advert. The advert plays in
+   * full: nothing is skipped, no field is deleted, no request is touched, the
+   * duration and the telemetry are exactly what they would be with no
+   * extension installed. It is muted and covered, so it is not heard and not
+   * seen.
+   *
+   * The wait remains, and that is the honest limit of it — this does not get
+   * the viewer's time back, it gets their attention back.
+   *
+   * ?ytacnoquiet=1 turns it off.
+   */
+  const QUIET_OFF = location.search.indexOf("ytacnoquiet=1") !== -1;
+  let coverEl = null;
+  let mutedByUs = false;
+  let priorMuted = null;
+
+  function quietAd(p, video) {
+    if (QUIET_OFF || !p || !video) return;
+
+    if (!mutedByUs) {
+      priorMuted = video.muted;
+      mutedByUs = true;
+    }
+    // Re-asserted every tick: the player restores its own volume state at ad
+    // boundaries, and a one-shot mute is silently undone a second later.
+    if (!video.muted) video.muted = true;
+
+    if (!coverEl || !coverEl.isConnected) {
+      coverEl = document.createElement("div");
+      coverEl.id = "ytac-ad-cover";
+      const label = document.createElement("div");
+      label.className = "ytac-ad-cover__label";
+      label.textContent = "Ad — muted and hidden";
+      coverEl.appendChild(label);
+      p.appendChild(coverEl);
+    }
+    // During a genuine advert video.duration IS the advert's length, because the
+    // player swaps the media. On a live stream it is the whole broadcast, and
+    // the first version of this label read "· 8725s" on a 2h26m stream. Show a
+    // countdown only when the number is plausible for an advert; anything above
+    // MAX_AD_SECONDS means duration is not measuring what this assumes, and a
+    // wrong number is worse than no number.
+    const raw = Number.isFinite(video.duration)
+      ? Math.max(Math.ceil(video.duration - video.currentTime), 0)
+      : null;
+    const left = raw !== null && raw <= MAX_AD_SECONDS ? raw : null;
+    const label = coverEl.firstChild;
+    if (label) {
+      label.textContent =
+        left === null ? "Ad — muted and hidden" : `Ad — muted and hidden · ${left}s`;
+    }
+  }
+
+  /** Undo it the moment the advert is gone, and restore the viewer's own mute. */
+  function unquietAd() {
+    if (coverEl) {
+      coverEl.remove();
+      coverEl = null;
+    }
+    if (mutedByUs) {
+      const v = document.querySelector(".html5-video-player video");
+      // Only hand back the state we found. If the viewer muted it themselves
+      // mid-advert, priorMuted is what they had BEFORE, so honour their action
+      // instead: leave a muted player muted only if that is what they chose.
+      if (v && priorMuted === false && v.muted) v.muted = false;
+      mutedByUs = false;
+      priorMuted = null;
+    }
+  }
+
   function publishPlayedThrough() {
     try {
       document.documentElement.setAttribute(
@@ -1089,6 +1168,7 @@
       // the gap between them exceeds this.
       if (!adGoneSince) adGoneSince = Date.now();
       else if (Date.now() - adGoneSince > AD_GAP_MS) adCredited = false;
+      unquietAd();
       return;
     }
     adGoneSince = 0;
@@ -1105,6 +1185,7 @@
       // NOT recordAd(): that credits lifetime.adsSkipped and secondsSaved, and
       // nothing was skipped and no time was saved. Claiming either would be the
       // extension taking credit for an advert the viewer sat through.
+      quietAd(p, p.querySelector("video"));
       vid.adSeen = true;
       if (!adCredited) {
         adCredited = true;
