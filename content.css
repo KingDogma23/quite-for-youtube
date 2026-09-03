@@ -14,6 +14,24 @@
  * the one function of this extension not implicated in the wall.
  *
  * content.js sets data-ytac-watch on /watch and clears it elsewhere.
+ *
+ * VERIFIED 2026-09-03, both directions, same build and same probe — an
+ * ytd-ad-slot-renderer injected into the live page and read back:
+ *
+ *     /feed/subscriptions   display: none      the hiding is live
+ *     /watch                display: inline    the rules stand down
+ *
+ * Done this way because YouTube would not serve a feed advert to read: the
+ * subscriptions feed carried 104 tiles and zero ad elements, and the home feed
+ * is empty while watch history is off. Injecting the node tests the stylesheet
+ * without needing an advert and without touching the account.
+ *
+ * NOT verified, and it is the container rules above rather than the backstop:
+ * ytd-rich-item-renderer is a Polymer element that rewrites its own children
+ * on upgrade, so a synthetic fixture does not reproduce YouTube's internals
+ * and :has() never matches it — has_any_slot came back false for a tree that
+ * demonstrably contained a slot. That is the instrument failing, not evidence
+ * the rules are broken. Reading them needs a real feed advert.
  */
 
 /*
