@@ -904,6 +904,12 @@
    * unconditionally: a viewer who had muted the video themselves before the
    * advert got sound blasted at them when the speed was restored. Dormant,
    * because the fast-forward path it lives on is off by default, but wrong.
+   *
+   * Verified on a GENUINE advert, 0.31.52: the viewer muted the player before
+   * the break (mp.mute()), a real 128s advert arrived — cover up, muted — and
+   * was ended by a trusted Skip press; the player read muted:true afterwards
+   * and still at +6s, no wall. Their choice survived the cycle. The synthetic
+   * arms (0.31.39) said the same; this is the reading on a real one.
    */
   function restoreMute() {
     if (!mutedByUs) return;
