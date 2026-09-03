@@ -947,6 +947,11 @@
    *   no mode                   +1 at first sight; unchanged at the gap
    *
    * Every path credits each advert exactly once, under the right label.
+   *
+   * And on 0.31.52, five in-session hops three seconds apart: six hops in the
+   * trace, no wall, no console errors, cover and mute released, rate 1 — and a
+   * genuine advert on one hop, credited once as played through (counter 1,
+   * sightings 3) and released. The click path, under load, with a real one.
    */
   let adPendingCredit = false;
   function creditPlayedThrough() {
