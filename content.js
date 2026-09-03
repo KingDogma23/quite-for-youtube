@@ -1288,9 +1288,29 @@
    *
    * A human presses Skip all day and it is one event; speed and seek are
    * timeline manipulations. That is a reason to expect click to survive and
-   * the other two not to — and a reason, not a measurement. Each has its own
+   * the other two not to — and a reason, not a measurement. One measured
+   * caveat against it (0.31.50, fake button with a listener): the press
+   * arrives with isTrusted:false, because element.click() dispatches a
+   * synthetic event. A handler that checks isTrusted ignores it; one that logs
+   * it has a clean signal. Neither is known for YouTube's. Each has its own
    * value so each can be an arm: ?ytacskip=click, =speed, =seek, comma-joined,
    * or =1 / =all for the old behaviour.
+   *
+   * Gates verified on fixtures, 0.31.50, live page, synthetic ad condition:
+   *
+   *   click   a fake Skip with a listener was pressed once (isTrusted false);
+   *           with no mode set, the same fixture was NOT pressed and the cover
+   *           and mute stayed on — the control
+   *   speed   43s Short: rate 16 and muted during, rate 1 and mute handed back
+   *           after
+   *   seek    43s Short, paused at 8.4: playhead to 43.0 of 43.1 with rate
+   *           still 1; when the condition cleared the guard put it back to 8.4,
+   *           because the "advert" was the viewer's own video
+   *   cross   click mode on an unskippable (no button): rate 1, no jump, cover
+   *           and mute on — speed and seek did not leak in
+   *
+   * What none of that measures is the wall. That needs a real advert on a load
+   * carrying the switch; the popup report carries the result.
    */
   const SKIP_MODE = (() => {
     const m = /[?&]ytacskip=([a-z0-9,]+)/i.exec(location.search);
