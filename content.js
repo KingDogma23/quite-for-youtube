@@ -932,6 +932,22 @@
    * without an action landing; and a pod credits the finished advert when the
    * next one begins, because a pod has no gap.
    */
+  /*
+   * Credit paths verified on 0.31.51 — synthetic advert conditions on a live
+   * page, tab visible, the count read before and after each:
+   *
+   *   click mode, unskippable   0 during; 0 at +2s (inside AD_GAP_MS); 1 at +5s
+   *   click mode, skippable     pressed once; count unchanged — skipped is not
+   *                             played through
+   *   click mode, flicker       class off 0.6s mid-advert: count unchanged;
+   *                             then pressed: still unchanged
+   *   click mode, pod           ad1 unskippable, playhead to 0 with the class
+   *                             still on: ad1 settled at once (+1, no gap);
+   *                             ad2 pressed: unchanged
+   *   no mode                   +1 at first sight; unchanged at the gap
+   *
+   * Every path credits each advert exactly once, under the right label.
+   */
   let adPendingCredit = false;
   function creditPlayedThrough() {
     if (adCredited) return;
