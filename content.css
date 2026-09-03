@@ -111,6 +111,11 @@ html:not([data-ytac-feed-off]):not([data-ytac-nosofthide]) ytd-ads-engagement-pa
 html:not([data-ytac-feed-off]):not([data-ytac-nosofthide]) ytd-compact-video-renderer:has(ytd-ad-slot-renderer),
 
 /* --- the ad element itself, as a backstop --- */
+/* There used to be a [data-ytac-hidden="1"] rule in this group. Nothing ever
+   set that attribute on a descendant, so it matched nothing — and content.js
+   sets the SAME name on <html> to mean "this tab was hidden", the validity
+   flag. Only the descendant combinator kept the two apart. Removed 2026-09-03
+   rather than left one edit away from hiding the whole page. */
 html:not([data-ytac-feed-off]):not([data-ytac-nosofthide]) ytd-ad-slot-renderer,
 html:not([data-ytac-feed-off]):not([data-ytac-nosofthide]) ad-slot-renderer,
 html:not([data-ytac-feed-off]):not([data-ytac-nosofthide]) ytm-companion-slot[data-content-type] > ytm-companion-ad-renderer,
@@ -137,9 +142,7 @@ html:not([data-ytac-feed-off]):not([data-ytac-nosofthide]) ytd-video-masthead-ad
 html:not([data-ytac-feed-off]):not([data-ytac-nosofthide]) ytd-primetime-promo-renderer,
 html:not([data-ytac-feed-off]):not([data-ytac-nosofthide]) ytd-companion-slot-renderer,
 html:not([data-ytac-feed-off]):not([data-ytac-nosofthide]) ytd-action-companion-ad-renderer,
-html:not([data-ytac-feed-off]):not([data-ytac-nosofthide]) ytm-promoted-video-renderer,
-
-html:not([data-ytac-feed-off]):not([data-ytac-nosofthide]) [data-ytac-hidden="1"] {
+html:not([data-ytac-feed-off]):not([data-ytac-nosofthide]) ytm-promoted-video-renderer {
   /* opacity, NEVER display — see the header. display:none on any one of these
      containers is detected, and the wall lands on the next video. */
   opacity: 0 !important;

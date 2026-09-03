@@ -99,6 +99,16 @@ check('CONTROL: display:none on an ad container DOES trip that check — so it c
       regressedBlocks.filter(b => /display:\s*none/.test(b)).length > 0,
       'the 0.31.35 behaviour, which walled the video on an in-session click');
 
+// data-ytac-hidden is the tab-visibility VALIDITY flag on <html>. No CSS rule
+// may target it: a descendant rule once did, dead but one edit from hiding the
+// whole page under the same name.
+check('css: no rule targets the data-ytac-hidden validity flag',
+      !/\[data-ytac-hidden/.test(cssCode),
+      'the attribute means "tab was hidden", not "hide this"');
+check('CONTROL: a rule on data-ytac-hidden DOES trip that check — so it can fail',
+      /\[data-ytac-hidden/.test(cssCode + '\n[data-ytac-hidden="1"] { opacity: 0 }'),
+      'the rule that shipped until 0.31.44');
+
 check('css: hiding is the default, gated on an opt-OUT attribute',
       css.includes(':not([data-ytac-feed-off])'),
       'rules apply before any script runs, so slots never paint');
